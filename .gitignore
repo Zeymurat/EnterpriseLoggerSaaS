@@ -1,6 +1,7 @@
 bin/
 obj/
 .env
+LOCAL-GUIDE.md
 .DS_Store
 .vscode/
 .idea/
