@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnterpriseLogger.Api", "Ent
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnterpriseLogger.Application.Tests", "EnterpriseLogger.Application.Tests\EnterpriseLogger.Application.Tests.csproj", "{15A515B5-9439-4210-8CBE-C28E256DB823}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EnterpriseLogger.Api.IntegrationTests", "EnterpriseLogger.Api.IntegrationTests\EnterpriseLogger.Api.IntegrationTests.csproj", "{38A06792-70C5-4383-A515-D5D443FCE7B8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,5 +44,9 @@ Global
 		{15A515B5-9439-4210-8CBE-C28E256DB823}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{15A515B5-9439-4210-8CBE-C28E256DB823}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{15A515B5-9439-4210-8CBE-C28E256DB823}.Release|Any CPU.Build.0 = Release|Any CPU
+		{38A06792-70C5-4383-A515-D5D443FCE7B8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{38A06792-70C5-4383-A515-D5D443FCE7B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{38A06792-70C5-4383-A515-D5D443FCE7B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{38A06792-70C5-4383-A515-D5D443FCE7B8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
