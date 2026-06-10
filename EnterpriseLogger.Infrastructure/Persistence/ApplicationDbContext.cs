@@ -6,8 +6,13 @@ namespace EnterpriseLogger.Infrastructure.Persistence;
 
 public class ApplicationDbContext : DbContext, IApplicationDbContext
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
+    private readonly ICurrentTenantProvider _tenantProvider;
+
+    public ApplicationDbContext(
+        DbContextOptions<ApplicationDbContext> options,
+        ICurrentTenantProvider tenantProvider) : base(options)
     {
+        _tenantProvider = tenantProvider;
     }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
@@ -42,6 +47,11 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasOne(s => s.Tenant)
                   .WithMany(t => t.Logs)
                   .HasForeignKey(s => s.TenantId);
+
+            // Multi-tenant izolasyon: okuma sorgularında yalnızca aktif tenant'ın logları.
+            // TenantId çözülmemişse hiçbir log satırı dönmez (sızıntı önlemi).
+            entity.HasQueryFilter(log =>
+                _tenantProvider.TenantId != null && log.TenantId == _tenantProvider.TenantId);
         });
     }
 

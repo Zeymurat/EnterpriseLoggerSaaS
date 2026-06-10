@@ -1,3 +1,4 @@
+using EnterpriseLogger.Application.Common;
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Features.Tenants.Dtos;
@@ -9,6 +10,8 @@ namespace EnterpriseLogger.Application.Features.Tenants.Commands;
 
 public class CreateTenantCommand
 {
+    private const int MaxApiKeyGenerationAttempts = 5;
+
     private readonly IApplicationDbContext _context;
     private readonly IValidator<CreateTenantRequest> _validator;
 
@@ -29,16 +32,14 @@ public class CreateTenantCommand
             return Result<TenantResponseDto>.Failure($"Validasyon hatası: {errors}");
         }
 
-        var isApiKeyExists = await _context.Tenants
-            .AnyAsync(t => t.ApiKey == request.ApiKey, cancellationToken);
-
-        if (isApiKeyExists)
-            return Result<TenantResponseDto>.Failure("Bu API Key sistemde zaten kullanımda.");
+        var apiKey = await GenerateUniqueApiKeyAsync(cancellationToken);
+        if (apiKey is null)
+            return Result<TenantResponseDto>.Failure("API Key üretilemedi. Lütfen tekrar deneyin.");
 
         var tenant = new Tenant
         {
             Name = request.Name.Trim(),
-            ApiKey = request.ApiKey.Trim(),
+            ApiKey = apiKey,
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
@@ -55,6 +56,21 @@ public class CreateTenantCommand
 
         return Result<TenantResponseDto>.Success(response);
     }
+
+    private async Task<string?> GenerateUniqueApiKeyAsync(CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < MaxApiKeyGenerationAttempts; attempt++)
+        {
+            var candidate = ApiKeyGenerator.Generate();
+            var exists = await _context.Tenants
+                .AnyAsync(t => t.ApiKey == candidate, cancellationToken);
+
+            if (!exists)
+                return candidate;
+        }
+
+        return null;
+    }
 }
 
 public class CreateTenantRequestValidator : AbstractValidator<CreateTenantRequest>
@@ -64,9 +80,5 @@ public class CreateTenantRequestValidator : AbstractValidator<CreateTenantReques
         RuleFor(x => x.Name)
             .NotEmpty().WithMessage("Şirket adı boş olamaz.")
             .MaximumLength(150).WithMessage("Şirket adı en fazla 150 karakter olabilir.");
-
-        RuleFor(x => x.ApiKey)
-            .NotEmpty().WithMessage("API Key alanı zorunludur.")
-            .MinimumLength(10).WithMessage("API Key en az 10 karakter olmalıdır.");
     }
 }

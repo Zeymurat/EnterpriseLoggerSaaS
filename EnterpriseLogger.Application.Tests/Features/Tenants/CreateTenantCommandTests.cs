@@ -21,22 +21,11 @@ public class CreateTenantCommandTests
     [Fact]
     public async Task ExecuteAsync_WhenNameIsEmpty_ShouldReturnFailureResult()
     {
-        var invalidRequest = new CreateTenantRequest("", "EL_SECRET_KEY_123");
+        var invalidRequest = new CreateTenantRequest("");
 
         var result = await _command.ExecuteAsync(invalidRequest);
 
         Assert.False(result.IsSuccess);
         Assert.Contains("Şirket adı boş olamaz.", result.ErrorMessage);
-    }
-
-    [Fact]
-    public async Task ExecuteAsync_WhenApiKeyIsTooShort_ShouldReturnFailureResult()
-    {
-        var invalidRequest = new CreateTenantRequest("Acme Corp", "short");
-
-        var result = await _command.ExecuteAsync(invalidRequest);
-
-        Assert.False(result.IsSuccess);
-        Assert.Contains("API Key en az 10 karakter olmalıdır.", result.ErrorMessage);
     }
 }
