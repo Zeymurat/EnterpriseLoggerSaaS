@@ -3,6 +3,7 @@ using System;
 using EnterpriseLogger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace EnterpriseLogger.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260614210916_AddIdentity")]
+    partial class AddIdentity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -253,11 +256,6 @@ namespace EnterpriseLogger.Infrastructure.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
-                    b.Property<string>("Phone")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
-
                     b.Property<int>("Role")
                         .HasColumnType("integer");
 
@@ -271,9 +269,6 @@ namespace EnterpriseLogger.Infrastructure.Migrations
                         .HasFilter("\"Role\" = 0");
 
                     b.HasIndex("TenantId", "Email")
-                        .IsUnique();
-
-                    b.HasIndex("TenantId", "Phone")
                         .IsUnique();
 
                     b.ToTable("Users");

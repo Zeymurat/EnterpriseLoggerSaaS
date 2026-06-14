@@ -1,5 +1,6 @@
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Domain.Entities;
+using EnterpriseLogger.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace EnterpriseLogger.Infrastructure.Persistence;
@@ -19,6 +20,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<SystemLog> SystemLogs => Set<SystemLog>();
     public DbSet<Package> Packages => Set<Package>();
     public DbSet<TenantSubscription> TenantSubscriptions => Set<TenantSubscription>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<Permission> Permissions => Set<Permission>();
+    public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -27,6 +31,48 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Tenant>(entity =>
         {
             entity.HasIndex(t => t.ApiKey).IsUnique();
+        });
+
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasIndex(u => new { u.TenantId, u.Email }).IsUnique();
+            entity.HasIndex(u => new { u.TenantId, u.Phone }).IsUnique();
+
+            entity.HasIndex(u => u.TenantId)
+                .IsUnique()
+                .HasFilter($"\"Role\" = {(int)TenantUserRole.Root}");
+
+            entity.HasOne(u => u.Tenant)
+                .WithMany(t => t.Users)
+                .HasForeignKey(u => u.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.Property(u => u.Email).HasMaxLength(256);
+            entity.Property(u => u.Phone).HasMaxLength(20);
+            entity.Property(u => u.PasswordHash).HasMaxLength(512);
+        });
+
+        modelBuilder.Entity<Permission>(entity =>
+        {
+            entity.HasIndex(p => p.Code).IsUnique();
+            entity.Property(p => p.Code).HasMaxLength(64);
+            entity.Property(p => p.Description).HasMaxLength(256);
+            entity.HasData(PermissionSeed.GetPermissions());
+        });
+
+        modelBuilder.Entity<UserPermission>(entity =>
+        {
+            entity.HasKey(up => new { up.UserId, up.PermissionId });
+
+            entity.HasOne(up => up.User)
+                .WithMany(u => u.UserPermissions)
+                .HasForeignKey(up => up.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(up => up.Permission)
+                .WithMany(p => p.UserPermissions)
+                .HasForeignKey(up => up.PermissionId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<TenantSubscription>(entity =>

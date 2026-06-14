@@ -13,6 +13,9 @@ public interface IApplicationDbContext
     DbSet<SystemLog> SystemLogs { get; }
     DbSet<Package> Packages { get; }
     DbSet<TenantSubscription> TenantSubscriptions { get; }
+    DbSet<User> Users { get; }
+    DbSet<Permission> Permissions { get; }
+    DbSet<UserPermission> UserPermissions { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

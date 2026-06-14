@@ -8,6 +8,7 @@ using EnterpriseLogger.Application.Features.Logs.Commands;
 using EnterpriseLogger.Application.Features.Logs.Queries;
 using EnterpriseLogger.Application.Features.Tenants.Commands;
 using EnterpriseLogger.Infrastructure.Persistence;
+using EnterpriseLogger.Infrastructure.Security;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
@@ -43,6 +44,7 @@ else
 }
 
 builder.Services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+builder.Services.AddScoped<IPasswordHasher, AspNetPasswordHasher>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenantProvider, HttpContextCurrentTenantProvider>();
 
