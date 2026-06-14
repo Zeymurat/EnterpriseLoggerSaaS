@@ -12,4 +12,5 @@ public class Tenant
     // ve birden fazla Log kaydı olabileceğini mimari olarak anlatıyoruz.
     public ICollection<TenantSubscription> Subscriptions { get; set; } = new List<TenantSubscription>();
     public ICollection<SystemLog> Logs { get; set; } = new List<SystemLog>();
+    public ICollection<User> Users { get; set; } = new List<User>();
 }

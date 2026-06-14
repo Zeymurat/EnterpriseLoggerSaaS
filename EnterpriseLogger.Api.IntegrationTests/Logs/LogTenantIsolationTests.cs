@@ -49,7 +49,14 @@ public class LogTenantIsolationTests : IClassFixture<EnterpriseLoggerWebApplicat
 
     private async Task<string> CreateTenantAsync(string name)
     {
-        var response = await _client.PostAsJsonAsync("/api/tenants", new { name });
+        var ownerEmail = $"{Guid.NewGuid():N}@test.com";
+        var response = await _client.PostAsJsonAsync("/api/tenants", new
+        {
+            name,
+            ownerEmail,
+            ownerPhone = "05551234567",
+            ownerPassword = "TestPass123"
+        });
         response.EnsureSuccessStatusCode();
 
         using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
