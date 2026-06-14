@@ -75,6 +75,10 @@ public class TenantMappingMiddleware
             && path.StartsWithSegments("/api/tenants", StringComparison.OrdinalIgnoreCase))
             return true;
 
+        if (context.Request.Method.Equals(HttpMethods.Post, StringComparison.OrdinalIgnoreCase)
+            && path.StartsWithSegments("/api/auth/login", StringComparison.OrdinalIgnoreCase))
+            return true;
+
         return false;
     }
 }

@@ -4,9 +4,11 @@ using EnterpriseLogger.Api.Middleware;
 using EnterpriseLogger.Api.Services;
 using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
+using EnterpriseLogger.Application.Features.Auth.Commands;
 using EnterpriseLogger.Application.Features.Logs.Commands;
 using EnterpriseLogger.Application.Features.Logs.Queries;
 using EnterpriseLogger.Application.Features.Tenants.Commands;
+using EnterpriseLogger.Infrastructure.Auth;
 using EnterpriseLogger.Infrastructure.Persistence;
 using EnterpriseLogger.Infrastructure.Security;
 using FluentValidation;
@@ -45,10 +47,15 @@ else
 
 builder.Services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 builder.Services.AddScoped<IPasswordHasher, AspNetPasswordHasher>();
+builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenantProvider, HttpContextCurrentTenantProvider>();
+builder.Services.AddScoped<ICurrentUserProvider, HttpContextCurrentUserProvider>();
+
+builder.Services.AddJwtAuthentication(builder.Environment);
 
 builder.Services.AddScoped<CreateTenantCommand>();
+builder.Services.AddScoped<LoginCommand>();
 builder.Services.AddScoped<CreateLogCommand>();
 builder.Services.AddScoped<GetLogsQuery>();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateTenantRequestValidator>();
@@ -70,6 +77,17 @@ builder.Services.AddSwaggerGen(options =>
         Type = SecuritySchemeType.ApiKey
     });
 
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description =
+            "JWT access token. POST /api/auth/login ile alın; değeri Bearer öneki olmadan yapıştırın.",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    });
+
     options.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
@@ -79,6 +97,17 @@ builder.Services.AddSwaggerGen(options =>
                 {
                     Type = ReferenceType.SecurityScheme,
                     Id = "ApiKey"
+                }
+            },
+            Array.Empty<string>()
+        },
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
                 }
             },
             Array.Empty<string>()
@@ -97,6 +126,8 @@ if (isDevelopment)
 }
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseMiddleware<TenantMappingMiddleware>();
 app.MapControllers();
 
