@@ -1,4 +1,5 @@
 using EnterpriseLogger.Api.Configuration;
+using EnterpriseLogger.Api.Infrastructure;
 using EnterpriseLogger.Api.Middleware;
 using EnterpriseLogger.Api.Services;
 using EnterpriseLogger.Application.Common.Constants;
@@ -20,6 +21,7 @@ var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING"
     ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
 var isTesting = builder.Environment.IsEnvironment("Testing");
+var isDevelopment = builder.Environment.IsDevelopment();
 
 if (string.IsNullOrWhiteSpace(connectionString) && !isTesting)
 {
@@ -48,6 +50,9 @@ builder.Services.AddScoped<CreateTenantCommand>();
 builder.Services.AddScoped<CreateLogCommand>();
 builder.Services.AddScoped<GetLogsQuery>();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateTenantRequestValidator>();
+
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -81,7 +86,9 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+app.UseExceptionHandler();
+
+if (isDevelopment)
 {
     app.UseSwagger();
     app.UseSwaggerUI();
@@ -90,6 +97,14 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseMiddleware<TenantMappingMiddleware>();
 app.MapControllers();
+
+if (isDevelopment || isTesting)
+{
+    app.MapGet("/api/_debug/throw", (HttpContext _) =>
+    {
+        throw new InvalidOperationException("ProblemDetails test — Development/Testing only.");
+    });
+}
 
 app.Run();
 
