@@ -65,7 +65,17 @@ public class LoginCommand
 
         var user = ResolveUser(matchingUsers, request.TenantName);
         if (user is null)
+        {
+            if (!string.IsNullOrWhiteSpace(request.TenantName)
+                && matchingUsers.Count > 1
+                && HasAmbiguousTenantName(matchingUsers, request.TenantName))
+            {
+                return Result<LoginResponse>.Failure(
+                    "Belirtilen şirket adı birden fazla kayıtla eşleşiyor. Şirket adını tam olarak girin (büyük/küçük harf duyarlı).");
+            }
+
             return Result<LoginResponse>.Failure(GenericAuthFailureMessage);
+        }
 
         if (!user.Tenant.IsActive)
             return Result<LoginResponse>.Failure("Hesap pasif durumda.");
@@ -107,11 +117,33 @@ public class LoginCommand
             return null;
 
         var normalizedTenantName = tenantName.Trim();
-        var tenantMatches = matchingUsers
+
+        var exactMatches = matchingUsers
+            .Where(u => u.Tenant.Name.Equals(normalizedTenantName, StringComparison.Ordinal))
+            .ToList();
+
+        if (exactMatches.Count == 1)
+            return exactMatches[0];
+
+        var caseInsensitiveMatches = matchingUsers
             .Where(u => u.Tenant.Name.Equals(normalizedTenantName, StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        return tenantMatches.Count == 1 ? tenantMatches[0] : null;
+        return caseInsensitiveMatches.Count == 1 ? caseInsensitiveMatches[0] : null;
+    }
+
+    private static bool HasAmbiguousTenantName(IReadOnlyList<User> matchingUsers, string tenantName)
+    {
+        var normalizedTenantName = tenantName.Trim();
+        var exactMatches = matchingUsers
+            .Where(u => u.Tenant.Name.Equals(normalizedTenantName, StringComparison.Ordinal))
+            .Count();
+
+        if (exactMatches == 1)
+            return false;
+
+        return matchingUsers.Count(u =>
+            u.Tenant.Name.Equals(normalizedTenantName, StringComparison.OrdinalIgnoreCase)) > 1;
     }
 
     private async Task UpdateLastLoginAsync(int userId, CancellationToken cancellationToken)

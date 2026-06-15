@@ -2,7 +2,14 @@ bin/
 obj/
 .env
 LOCAL-GUIDE.md
+LOCAL-BACKEND-GUIDE.md
+LOCAL-FRONTEND-GUIDE.md
 .DS_Store
 .vscode/
 .idea/
 *.user
+
+# Frontend
+apps/**/node_modules/
+apps/**/dist/
+apps/**/.env

@@ -111,6 +111,30 @@ public class LoginTests : IClassFixture<EnterpriseLoggerWebApplicationFactory>
             successDoc!.RootElement.GetProperty("data").GetProperty("user").GetProperty("tenantName").GetString());
     }
 
+    [Fact]
+    public async Task Login_SameEmailTenantsDifferOnlyByCase_ResolvesWithExactTenantName()
+    {
+        const string sharedEmail = "case-tenant@test.com";
+        const string password = "TestPass123";
+
+        await RegisterTenantAsync("Acme Corp", sharedEmail, password, "05553331111");
+        await RegisterTenantAsync("acme corp", sharedEmail, password, "05553332222");
+
+        var response = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = sharedEmail,
+            password,
+            tenantName = "acme corp"
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
+        Assert.Equal(
+            "acme corp",
+            doc!.RootElement.GetProperty("data").GetProperty("user").GetProperty("tenantName").GetString());
+    }
+
     private async Task RegisterTenantAsync(
         string name,
         string ownerEmail,
