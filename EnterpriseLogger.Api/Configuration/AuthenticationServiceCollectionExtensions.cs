@@ -75,28 +75,25 @@ public static class AuthenticationServiceCollectionExtensions
 
         services.AddAuthorization(options =>
         {
-            options.AddPolicy(AuthPolicies.LogsRead, policy =>
-            {
-                policy.AddAuthenticationSchemes(DualAuthScheme);
-                policy.RequireAuthenticatedUser();
-                policy.AddRequirements(
-                    new PermissionRequirement(PermissionCodes.LogsRead),
-                    new ActiveTenantRequirement());
-            });
+            AddJwtPermissionPolicy(options, AuthPolicies.LogsRead, PermissionCodes.LogsRead, DualAuthScheme);
+            AddJwtPermissionPolicy(options, AuthPolicies.LogsWrite, PermissionCodes.LogsWrite, DualAuthScheme);
 
-            options.AddPolicy(AuthPolicies.LogsWrite, policy =>
+            AddJwtPermissionPolicy(options, AuthPolicies.UsersRead, PermissionCodes.UsersRead, JwtBearerDefaults.AuthenticationScheme);
+            AddJwtPermissionPolicy(options, AuthPolicies.UsersInvite, PermissionCodes.UsersInvite, JwtBearerDefaults.AuthenticationScheme);
+            AddJwtPermissionPolicy(options, AuthPolicies.UsersManage, PermissionCodes.UsersManage, JwtBearerDefaults.AuthenticationScheme);
+
+            options.AddPolicy(AuthPolicies.TenantRootOnly, policy =>
             {
-                policy.AddAuthenticationSchemes(DualAuthScheme);
+                policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme);
                 policy.RequireAuthenticatedUser();
-                policy.AddRequirements(
-                    new PermissionRequirement(PermissionCodes.LogsWrite),
-                    new ActiveTenantRequirement());
+                policy.AddRequirements(new RootOnlyRequirement(), new ActiveTenantRequirement());
             });
         });
 
         services.AddSingleton<IAuthorizationMiddlewareResultHandler, ProblemDetailsAuthorizationMiddlewareResultHandler>();
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
         services.AddScoped<IAuthorizationHandler, ActiveTenantAuthorizationHandler>();
+        services.AddScoped<IAuthorizationHandler, RootOnlyAuthorizationHandler>();
 
         return services;
     }
@@ -136,4 +133,20 @@ public static class AuthenticationServiceCollectionExtensions
 
     private static int ParseExpiryMinutes(string? value, int defaultValue) =>
         int.TryParse(value, out var minutes) && minutes > 0 ? minutes : defaultValue;
+
+    private static void AddJwtPermissionPolicy(
+        AuthorizationOptions options,
+        string policyName,
+        string permission,
+        string authenticationScheme)
+    {
+        options.AddPolicy(policyName, policy =>
+        {
+            policy.AddAuthenticationSchemes(authenticationScheme);
+            policy.RequireAuthenticatedUser();
+            policy.AddRequirements(
+                new PermissionRequirement(permission),
+                new ActiveTenantRequirement());
+        });
+    }
 }

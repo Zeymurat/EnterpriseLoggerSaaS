@@ -22,6 +22,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="..\EnterpriseLogger.Api\EnterpriseLogger.Api.csproj" />
   </ItemGroup>
 
