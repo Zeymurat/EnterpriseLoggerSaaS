@@ -7,6 +7,8 @@ using EnterpriseLogger.Application.Features.Auth.Commands;
 using EnterpriseLogger.Application.Features.Logs.Commands;
 using EnterpriseLogger.Application.Features.Logs.Queries;
 using EnterpriseLogger.Application.Features.Tenants.Commands;
+using EnterpriseLogger.Application.Features.Users.Commands;
+using EnterpriseLogger.Application.Features.Users.Queries;
 using EnterpriseLogger.Infrastructure.Auth;
 using EnterpriseLogger.Infrastructure.Persistence;
 using EnterpriseLogger.Infrastructure.Security;
@@ -57,6 +59,11 @@ builder.Services.AddScoped<CreateTenantCommand>();
 builder.Services.AddScoped<LoginCommand>();
 builder.Services.AddScoped<CreateLogCommand>();
 builder.Services.AddScoped<GetLogsQuery>();
+builder.Services.AddScoped<GetTenantUsersQuery>();
+builder.Services.AddScoped<InviteUserCommand>();
+builder.Services.AddScoped<UpdateUserPermissionsCommand>();
+builder.Services.AddScoped<UpdateUserRoleCommand>();
+builder.Services.AddScoped<DeactivateUserCommand>();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateTenantRequestValidator>();
 
 builder.Services.AddProblemDetails();
@@ -114,6 +121,13 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+if (isTesting)
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    await DatabaseSeeder.SeedAsync(db);
+}
 
 app.UseExceptionHandler();
 

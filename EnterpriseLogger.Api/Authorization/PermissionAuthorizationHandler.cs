@@ -18,7 +18,9 @@ public class PermissionAuthorizationHandler : AuthorizationHandler<PermissionReq
             return Task.CompletedTask;
         }
 
-        if (context.User.HasClaim(AuthClaimTypes.Permission, requirement.Permission))
+        if (context.User.HasClaim(c =>
+                (c.Type == AuthClaimTypes.Permission || c.Type == "permissions")
+                && c.Value == requirement.Permission))
             context.Succeed(requirement);
 
         return Task.CompletedTask;

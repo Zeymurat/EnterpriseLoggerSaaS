@@ -39,14 +39,15 @@ public class HttpContextCurrentUserProvider : ICurrentUserProvider
     {
         get
         {
-            var role = _httpContextAccessor.HttpContext?.User.FindFirstValue(AuthClaimTypes.Role);
-            return Enum.TryParse<TenantUserRole>(role, out var parsed) ? parsed : null;
+            var role = _httpContextAccessor.HttpContext?.User.FindFirstValue(AuthClaimTypes.Role)
+                ?? _httpContextAccessor.HttpContext?.User.FindFirstValue(ClaimTypes.Role);
+            return Enum.TryParse<TenantUserRole>(role, ignoreCase: true, out var parsed) ? parsed : null;
         }
     }
 
     public IReadOnlyList<string> Permissions =>
         _httpContextAccessor.HttpContext?.User
-            .FindAll(AuthClaimTypes.Permission)
+            .FindAll(c => c.Type == AuthClaimTypes.Permission || c.Type == "permissions")
             .Select(c => c.Value)
             .Distinct(StringComparer.Ordinal)
             .ToList()

@@ -164,6 +164,11 @@ dotnet test
 |--------|-------|------|-------------|
 | `POST` | `/api/tenants` | — | Register a new tenant |
 | `POST` | `/api/auth/login` | — | Panel login (email + password → JWT) |
+| `GET` | `/api/users` | Bearer JWT | List tenant users (`users:read`) |
+| `POST` | `/api/users/invite` | Bearer JWT | Invite Admin or User (`users:invite`) |
+| `PATCH` | `/api/users/{id}/permissions` | Bearer JWT | Update User role permissions (`users:manage`) |
+| `PATCH` | `/api/users/{id}/role` | Bearer JWT (Root) | Promote User → Admin |
+| `PATCH` | `/api/users/{id}/deactivate` | Bearer JWT | Deactivate user (`users:manage`) |
 | `POST` | `/api/logs` | `X-Api-Key` **or** `Bearer JWT` | Ingest a log entry (`Info`, `Warning`, `Error`) |
 | `GET` | `/api/logs` | `X-Api-Key` **or** `Bearer JWT` | List logs for the authenticated tenant |
 
@@ -213,6 +218,30 @@ If the same email exists in multiple tenants, include `tenantName`:
 | **Human (panel)** | `Authorization: Bearer <JWT>` | Root / Admin / User | `logs:read` (GET), `logs:write` (POST) |
 
 Send the tenant API key for machine integration, or a JWT from login for the admin panel. In Swagger, use **Authorize** for either `X-Api-Key` or `Bearer`.
+
+### User management (JWT only)
+
+**Invite user** (`POST /api/users/invite`) — response includes `temporaryPassword` (shown once; no email server yet).
+
+```json
+{
+  "email": "dev@acme.com",
+  "phone": "05551234567",
+  "role": "User",
+  "permissions": ["logs:read"]
+}
+```
+
+| Rule | Detail |
+|------|--------|
+| Root | Full tenant control; only Root can invite Admin or change roles |
+| Admin | Can invite Users, manage User permissions, deactivate Users |
+| User | Custom permissions via `UserPermissions` table |
+| Root | Cannot be deactivated or have role changed |
+| Inactive user | Can be re-invited with same email (new `temporaryPassword`, reactivated) |
+| Duplicate email/phone | `409 Conflict` within the same tenant (active users) |
+
+**Permission changes:** After `PATCH /api/users/{id}/permissions`, the affected user must **log in again** to receive a JWT with updated permissions (existing tokens keep old claims until expiry).
 
 **Create log example**
 
@@ -281,7 +310,7 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 - [x] Global query filters for multi-tenant isolation
 - [x] JWT login endpoint (`POST /api/auth/login`)
 - [x] Dual-auth pipeline (JWT + ApiKey on log endpoints)
-- [ ] Tenant user management (invite, permissions)
+- [x] Tenant user management (invite, permissions, role, deactivate)
 - [ ] CORS for frontend clients
 - [ ] Redis for rate limits / quotas
 - [ ] GitHub Actions CI (`build` + `test`)
