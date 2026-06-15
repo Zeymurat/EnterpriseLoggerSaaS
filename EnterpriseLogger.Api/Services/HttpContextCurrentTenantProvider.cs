@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
 
@@ -16,15 +17,21 @@ public class HttpContextCurrentTenantProvider : ICurrentTenantProvider
     {
         get
         {
-            var items = _httpContextAccessor.HttpContext?.Items;
-            if (items is null || !items.TryGetValue(TenantAuthConstants.TenantIdItemKey, out var value))
+            var httpContext = _httpContextAccessor.HttpContext;
+            if (httpContext is null)
                 return null;
 
-            return value switch
+            if (httpContext.Items.TryGetValue(TenantAuthConstants.TenantIdItemKey, out var value))
             {
-                int id => id,
-                _ => null
-            };
+                return value switch
+                {
+                    int id => id,
+                    _ => null
+                };
+            }
+
+            var tenantIdClaim = httpContext.User.FindFirst(AuthClaimTypes.TenantId)?.Value;
+            return int.TryParse(tenantIdClaim, out var tenantId) ? tenantId : null;
         }
     }
 }

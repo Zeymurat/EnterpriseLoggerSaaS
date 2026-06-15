@@ -164,8 +164,8 @@ dotnet test
 |--------|-------|------|-------------|
 | `POST` | `/api/tenants` | — | Register a new tenant |
 | `POST` | `/api/auth/login` | — | Panel login (email + password → JWT) |
-| `POST` | `/api/logs` | `X-Api-Key` | Ingest a log entry (`Info`, `Warning`, `Error`) |
-| `GET` | `/api/logs` | `X-Api-Key` | List logs for the authenticated tenant |
+| `POST` | `/api/logs` | `X-Api-Key` **or** `Bearer JWT` | Ingest a log entry (`Info`, `Warning`, `Error`) |
+| `GET` | `/api/logs` | `X-Api-Key` **or** `Bearer JWT` | List logs for the authenticated tenant |
 
 ### Register tenant
 
@@ -203,11 +203,16 @@ If the same email exists in multiple tenants, include `tenantName`:
 }
 ```
 
-**Success:** `200 OK` with `accessToken`, `expiresIn`, and `user` (role, permissions). Use Swagger **Authorize → Bearer** to paste the token. Log endpoints still use `X-Api-Key` until dual-auth (PR-6).
+**Success:** `200 OK` with `accessToken`, `expiresIn`, and `user` (role, permissions). Use Swagger **Authorize → Bearer** to paste the token.
 
-### Log ingestion & query
+### Log ingestion & query (dual-channel auth)
 
-Send the tenant API key on every log request. In Swagger, click **Authorize** and paste the key into `X-Api-Key`.
+| Channel | Header | Who | Permission check |
+|---------|--------|-----|------------------|
+| **Machine** | `X-Api-Key` | Customer app / backend | None (tenant scope only) |
+| **Human (panel)** | `Authorization: Bearer <JWT>` | Root / Admin / User | `logs:read` (GET), `logs:write` (POST) |
+
+Send the tenant API key for machine integration, or a JWT from login for the admin panel. In Swagger, use **Authorize** for either `X-Api-Key` or `Bearer`.
 
 **Create log example**
 
@@ -271,11 +276,11 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 - [x] Global exception handling (RFC 7807 Problem Details)
 - [x] `POST /api/logs` with tenant-scoped ingestion
 - [x] `GET /api/logs` with tenant-scoped query
-- [x] API key authentication middleware (`X-Api-Key`)
+- [x] API key authentication (`X-Api-Key` via authentication handler)
 - [x] Integration tests (`WebApplicationFactory`)
 - [x] Global query filters for multi-tenant isolation
 - [x] JWT login endpoint (`POST /api/auth/login`)
-- [ ] Dual-auth pipeline (JWT + ApiKey on log endpoints)
+- [x] Dual-auth pipeline (JWT + ApiKey on log endpoints)
 - [ ] Tenant user management (invite, permissions)
 - [ ] CORS for frontend clients
 - [ ] Redis for rate limits / quotas

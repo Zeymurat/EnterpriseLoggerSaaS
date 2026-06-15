@@ -1,16 +1,22 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using EnterpriseLogger.Api.Authentication;
+using EnterpriseLogger.Api.Authorization;
 using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 
 namespace EnterpriseLogger.Api.Configuration;
 
-public static class JwtServiceCollectionExtensions
+public static class AuthenticationServiceCollectionExtensions
 {
-    public static IServiceCollection AddJwtAuthentication(
+    public const string DualAuthScheme = "DualAuth";
+
+    public static IServiceCollection AddDualAuthentication(
         this IServiceCollection services,
         IHostEnvironment environment)
     {
@@ -19,10 +25,20 @@ public static class JwtServiceCollectionExtensions
 
         services.AddAuthentication(options =>
         {
-            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            options.DefaultAuthenticateScheme = DualAuthScheme;
+            options.DefaultChallengeScheme = DualAuthScheme;
         })
-        .AddJwtBearer(options =>
+        .AddPolicyScheme(DualAuthScheme, "ApiKey or Bearer JWT", options =>
+        {
+            options.ForwardDefaultSelector = context =>
+            {
+                if (context.Request.Headers.ContainsKey(TenantAuthConstants.ApiKeyHeaderName))
+                    return AuthSchemeNames.ApiKey;
+
+                return JwtBearerDefaults.AuthenticationScheme;
+            };
+        })
+        .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
         {
             options.TokenValidationParameters = new TokenValidationParameters
             {
@@ -52,7 +68,35 @@ public static class JwtServiceCollectionExtensions
                     return Task.CompletedTask;
                 }
             };
+        })
+        .AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
+            AuthSchemeNames.ApiKey,
+            _ => { });
+
+        services.AddAuthorization(options =>
+        {
+            options.AddPolicy(AuthPolicies.LogsRead, policy =>
+            {
+                policy.AddAuthenticationSchemes(DualAuthScheme);
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(
+                    new PermissionRequirement(PermissionCodes.LogsRead),
+                    new ActiveTenantRequirement());
+            });
+
+            options.AddPolicy(AuthPolicies.LogsWrite, policy =>
+            {
+                policy.AddAuthenticationSchemes(DualAuthScheme);
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(
+                    new PermissionRequirement(PermissionCodes.LogsWrite),
+                    new ActiveTenantRequirement());
+            });
         });
+
+        services.AddSingleton<IAuthorizationMiddlewareResultHandler, ProblemDetailsAuthorizationMiddlewareResultHandler>();
+        services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddScoped<IAuthorizationHandler, ActiveTenantAuthorizationHandler>();
 
         return services;
     }
