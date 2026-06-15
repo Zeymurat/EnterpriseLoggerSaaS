@@ -1,7 +1,9 @@
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Features.Logs.Commands;
 using EnterpriseLogger.Application.Features.Logs.Dtos;
 using EnterpriseLogger.Application.Features.Logs.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EnterpriseLogger.Api.Controllers;
@@ -19,6 +21,7 @@ public class LogsController : ControllerBase
         _getLogsQuery = getLogsQuery;
     }
 
+    [Authorize(Policy = AuthPolicies.LogsRead)]
     [HttpGet]
     public async Task<ActionResult<Result<IReadOnlyList<LogResponseDto>>>> Get(
         CancellationToken cancellationToken)
@@ -31,6 +34,7 @@ public class LogsController : ControllerBase
         return Ok(result);
     }
 
+    [Authorize(Policy = AuthPolicies.LogsWrite)]
     [HttpPost]
     public async Task<ActionResult<Result<LogResponseDto>>> Create(
         [FromBody] CreateLogRequest request,

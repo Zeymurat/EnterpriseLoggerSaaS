@@ -1,6 +1,5 @@
 using EnterpriseLogger.Api.Configuration;
 using EnterpriseLogger.Api.Infrastructure;
-using EnterpriseLogger.Api.Middleware;
 using EnterpriseLogger.Api.Services;
 using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
@@ -52,7 +51,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenantProvider, HttpContextCurrentTenantProvider>();
 builder.Services.AddScoped<ICurrentUserProvider, HttpContextCurrentUserProvider>();
 
-builder.Services.AddJwtAuthentication(builder.Environment);
+builder.Services.AddDualAuthentication(builder.Environment);
 
 builder.Services.AddScoped<CreateTenantCommand>();
 builder.Services.AddScoped<LoginCommand>();
@@ -70,8 +69,7 @@ builder.Services.AddSwaggerGen(options =>
     options.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
     {
         Description =
-            "Tenant API anahtarı. Önce POST /api/tenants ile kayıt olun; yanıttaki apiKey değerini buraya yapıştırın. " +
-            "Log endpoint'leri (GET/POST /api/logs) için zorunludur.",
+            "Tenant API anahtarı veya JWT. Makine entegrasyonu için apiKey; panel için POST /api/auth/login sonrası Bearer token.",
         Name = TenantAuthConstants.ApiKeyHeaderName,
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey
@@ -128,7 +126,6 @@ if (isDevelopment)
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseMiddleware<TenantMappingMiddleware>();
 app.MapControllers();
 
 if (isDevelopment || isTesting)
