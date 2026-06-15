@@ -87,7 +87,9 @@ EnterpriseLoggerSaaS/
 │   ├── Middleware/           # TenantMappingMiddleware (API key)
 │   └── Infrastructure/       # GlobalExceptionHandler, ApiProblemDetails
 ├── EnterpriseLogger.Application.Tests/
-└── EnterpriseLogger.Api.IntegrationTests/
+├── EnterpriseLogger.Api.IntegrationTests/
+└── apps/
+    └── tenant-panel/         # React SPA (Vite + Tailwind + shadcn-style UI)
 ```
 
 ---
@@ -150,7 +152,18 @@ dotnet run --project EnterpriseLogger.Api
 
 Swagger UI (Development): **http://localhost:5247/swagger**
 
-### 5. Run tests
+### 5. Run tenant panel (optional)
+
+```bash
+cd apps/tenant-panel
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Panel: **http://localhost:5173** — requires API running and `CORS_ALLOWED_ORIGINS=http://localhost:5173` in root `.env`.
+
+### 6. Run tests
 
 ```bash
 dotnet test
@@ -276,6 +289,10 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 
 **JWT variables** (see `.env.example`): `JWT_SECRET` (min 32 chars), `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_ACCESS_TOKEN_EXPIRY_MINUTES`.
 
+**CORS** (tenant panel): `CORS_ALLOWED_ORIGINS` — comma-separated origins; default `http://localhost:5173`.
+
+**Frontend** (`apps/tenant-panel/.env`): `VITE_API_URL=http://localhost:5247`
+
 ---
 
 ## Development workflow
@@ -311,7 +328,9 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 - [x] JWT login endpoint (`POST /api/auth/login`)
 - [x] Dual-auth pipeline (JWT + ApiKey on log endpoints)
 - [x] Tenant user management (invite, permissions, role, deactivate)
-- [ ] CORS for frontend clients
+- [x] CORS for frontend clients
+- [x] Tenant panel skeleton (React + Vite + Tailwind)
+- [ ] Logs & users UI in tenant panel
 - [ ] Redis for rate limits / quotas
 - [ ] GitHub Actions CI (`build` + `test`)
 

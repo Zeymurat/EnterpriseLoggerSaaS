@@ -54,6 +54,7 @@ builder.Services.AddScoped<ICurrentTenantProvider, HttpContextCurrentTenantProvi
 builder.Services.AddScoped<ICurrentUserProvider, HttpContextCurrentUserProvider>();
 
 builder.Services.AddDualAuthentication(builder.Environment);
+builder.Services.AddFrontendCors(builder.Configuration);
 
 builder.Services.AddScoped<CreateTenantCommand>();
 builder.Services.AddScoped<LoginCommand>();
@@ -137,6 +138,7 @@ if (isDevelopment)
     app.UseSwaggerUI();
 }
 
+app.UseCors(FrontendCorsExtensions.PolicyName);
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
