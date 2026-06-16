@@ -3,9 +3,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { Toaster } from '@/components/ui/sonner'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
-import { PlaceholderPage } from '@/pages/PlaceholderPage'
+import { LogsPage } from '@/pages/LogsPage'
+import { UsersPage } from '@/pages/UsersPage'
 
 const queryClient = new QueryClient()
 
@@ -19,30 +21,15 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<DashboardPage />} />
-                <Route
-                  path="/logs"
-                  element={
-                    <PlaceholderPage
-                      title="Logs"
-                      description="Tenant log listesi ve filtreleme"
-                    />
-                  }
-                />
-                <Route
-                  path="/users"
-                  element={
-                    <PlaceholderPage
-                      title="Users"
-                      description="Kullanıcı davet, izin ve rol yönetimi"
-                    />
-                  }
-                />
+                <Route path="/logs" element={<LogsPage />} />
+                <Route path="/users" element={<UsersPage />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>
+      <Toaster />
     </QueryClientProvider>
   )
 }

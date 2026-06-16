@@ -18,7 +18,7 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      <header className="border-b bg-background">
+      <header className="sticky top-0 z-40 border-b bg-background">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-8">
             <div>
@@ -54,7 +54,7 @@ export function AppLayout() {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-6">
         <Outlet />
       </main>
     </div>

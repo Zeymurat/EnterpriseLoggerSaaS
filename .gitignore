@@ -13,3 +13,4 @@ LOCAL-FRONTEND-GUIDE.md
 apps/**/node_modules/
 apps/**/dist/
 apps/**/.env
+apps/**/.vite/
