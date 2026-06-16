@@ -59,8 +59,16 @@ public class LoginCommand
 
         if (matchingUsers.Count > 1 && string.IsNullOrWhiteSpace(request.TenantName))
         {
-            return Result<LoginResponse>.Failure(
-                "Bu e-posta birden fazla şirkete kayıtlı. Giriş için şirket adını belirtin.");
+            var tenantOptions = matchingUsers
+                .Select(u => new TenantLoginOptionDto(
+                    u.Tenant.Name,
+                    u.Role.ToString()))
+                .OrderBy(option => option.TenantName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return Result<LoginResponse>.AmbiguousTenant(
+                "Bu e-posta birden fazla şirkete kayıtlı. Lütfen şirket seçin.",
+                tenantOptions);
         }
 
         var user = ResolveUser(matchingUsers, request.TenantName);

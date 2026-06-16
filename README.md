@@ -211,7 +211,24 @@ dotnet test
 }
 ```
 
-If the same email exists in multiple tenants, include `tenantName`:
+**Success:** `200 OK` with `accessToken`, `expiresIn`, and `user` (role, permissions). Use Swagger **Authorize → Bearer** to paste the token.
+
+If the same email exists in multiple tenants and `tenantName` is omitted, the API returns **400 Bad Request** with `errorCode: "AmbiguousTenantContext"` and `tenantOptions` (tenant name + role per match). The tenant panel shows a picker and retries login with the selected `tenantName`:
+
+```json
+{
+  "data": null,
+  "isSuccess": false,
+  "errorCode": "AmbiguousTenantContext",
+  "errorMessage": "Multiple tenants match this email. Please specify tenantName.",
+  "tenantOptions": [
+    { "tenantName": "zeymurat", "role": "Root", "displayName": null },
+    { "tenantName": "Zeymurat-Global", "role": "User", "displayName": null }
+  ]
+}
+```
+
+Retry with an explicit tenant:
 
 ```json
 {
@@ -220,8 +237,6 @@ If the same email exists in multiple tenants, include `tenantName`:
   "tenantName": "Acme Corp"
 }
 ```
-
-**Success:** `200 OK` with `accessToken`, `expiresIn`, and `user` (role, permissions). Use Swagger **Authorize → Bearer** to paste the token.
 
 ### Log ingestion & query (dual-channel auth)
 

@@ -1,13 +1,22 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, Database, RefreshCw, Search, Sparkles } from 'lucide-react'
+import { AlertTriangle, Database, RefreshCw, ScrollText, Search } from 'lucide-react'
 import { createLog, getLogs, useMockLogsOnly, type LogEntry } from '@/lib/api'
 import { DEMO_LOG_PAYLOADS, isMockLogEntry, MOCK_LOG_ENTRIES } from '@/lib/mock-logs'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { LogLevelBadge } from '@/components/logs/LogLevelBadge'
+import {
+  AccessDeniedCard,
+  EmptyState,
+  MockDataBanner,
+  PageHeader,
+  StatCard,
+} from '@/components/layout/PageShell'
 import { cn } from '@/lib/utils'
 
 type LevelFilter = 'All' | 'Info' | 'Warning' | 'Error'
@@ -98,76 +107,69 @@ export function LogsPage() {
   )
 
   if (!can('logs:read')) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-destructive" />
-            Erişim reddedildi
-          </CardTitle>
-          <CardDescription>
-            Log listesini görüntülemek için <code className="text-xs">logs:read</code> izni gerekir.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    )
+    return <AccessDeniedCard permission="logs:read" />
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Logs</h1>
-          <p className="text-muted-foreground">Tenant loglarını izleyin ve filtreleyin.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => logsQuery.refetch()}
-            disabled={useMockLogsOnly() || logsQuery.isFetching}
-          >
-            <RefreshCw className={cn('h-4 w-4', logsQuery.isFetching && 'animate-spin')} />
-            Yenile
-          </Button>
-          {can('logs:write') && dataSource !== 'mock' && (
+      <PageHeader
+        title="Loglar"
+        description="Tenant loglarını izleyin, filtreleyin ve analiz edin."
+        actions={
+          <>
             <Button
+              variant="outline"
               size="sm"
-              onClick={() => seedMutation.mutate()}
-              disabled={seedMutation.isPending}
+              onClick={() => logsQuery.refetch()}
+              disabled={useMockLogsOnly() || logsQuery.isFetching}
             >
-              <Database className="h-4 w-4" />
-              {seedMutation.isPending ? 'Yükleniyor...' : 'Demo logları API\'ye yükle'}
+              <RefreshCw className={cn('h-4 w-4', logsQuery.isFetching && 'animate-spin')} />
+              Yenile
             </Button>
-          )}
-        </div>
-      </div>
+            {can('logs:write') && dataSource !== 'mock' && (
+              <Button
+                size="sm"
+                onClick={() => seedMutation.mutate()}
+                disabled={seedMutation.isPending}
+              >
+                <Database className="h-4 w-4" />
+                {seedMutation.isPending ? 'Yükleniyor...' : 'Demo yükle'}
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {showingMockFallback && (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
-          <div>
-            <p className="font-medium">Demo verisi gösteriliyor</p>
-            <p className="text-amber-800/90">
-              {dataSource === 'mock-fallback'
-                ? 'API\'de henüz log yok — örnek kayıtlar listeleniyor. "Demo logları API\'ye yükle" ile gerçek veriye dönüştürebilirsiniz.'
-                : 'VITE_USE_MOCK_LOGS=true — yalnızca mock veri modu aktif.'}
-            </p>
-          </div>
-        </div>
+        <MockDataBanner
+          title="Demo verisi gösteriliyor"
+          description={
+            dataSource === 'mock-fallback'
+              ? "API'de henüz log yok — örnek kayıtlar listeleniyor. Demo yükle ile gerçek veriye dönüştürebilirsiniz."
+              : 'VITE_USE_MOCK_LOGS=true — yalnızca mock veri modu aktif.'
+          }
+        />
       )}
 
       {logsQuery.isError && !useMockLogsOnly() && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-          API hatası: {(logsQuery.error as Error).message} — demo veri gösteriliyor.
-        </div>
+        <Alert variant="destructive">
+          <AlertTitle>API hatası</AlertTitle>
+          <AlertDescription>
+            {(logsQuery.error as Error).message} — demo veri gösteriliyor.
+          </AlertDescription>
+        </Alert>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Toplam" value={displayLogs.length} />
+        <StatCard label="Toplam" value={displayLogs.length} icon={ScrollText} />
         <StatCard label="Info" value={countByLevel(displayLogs, 'Info')} tone="info" />
         <StatCard label="Warning" value={countByLevel(displayLogs, 'Warning')} tone="warning" />
-        <StatCard label="Error" value={countByLevel(displayLogs, 'Error')} tone="error" />
+        <StatCard
+          label="Error"
+          value={countByLevel(displayLogs, 'Error')}
+          tone="error"
+          icon={AlertTriangle}
+        />
       </div>
 
       <Card>
@@ -189,8 +191,8 @@ export function LogsPage() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              <select
-                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              <Select
+                className="min-w-[160px]"
                 value={levelFilter}
                 onChange={(e) => setLevelFilter(e.target.value as LevelFilter)}
               >
@@ -198,7 +200,7 @@ export function LogsPage() {
                 <option value="Info">Info</option>
                 <option value="Warning">Warning</option>
                 <option value="Error">Error</option>
-              </select>
+              </Select>
             </div>
           </div>
         </CardHeader>
@@ -206,7 +208,7 @@ export function LogsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40 text-left text-muted-foreground">
+                <tr className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-6 py-3 font-medium">Zaman</th>
                   <th className="px-6 py-3 font-medium">Seviye</th>
                   <th className="px-6 py-3 font-medium">Uygulama</th>
@@ -216,8 +218,11 @@ export function LogsPage() {
               <tbody>
                 {filteredLogs.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">
-                      Filtreye uygun log bulunamadı.
+                    <td colSpan={4}>
+                      <EmptyState
+                        title="Filtreye uygun log bulunamadı"
+                        description="Arama veya seviye filtresini değiştirmeyi deneyin."
+                      />
                     </td>
                   </tr>
                 ) : (
@@ -225,18 +230,18 @@ export function LogsPage() {
                     <tr
                       key={log.id}
                       className={cn(
-                        'border-b transition-colors hover:bg-muted/20',
-                        isMockLogEntry(log) && showingMockFallback && 'bg-amber-50/40',
+                        'border-b transition-colors hover:bg-muted/30',
+                        isMockLogEntry(log) && showingMockFallback && 'bg-amber-50/30',
                       )}
                     >
-                      <td className="whitespace-nowrap px-6 py-3 font-mono text-xs text-muted-foreground">
+                      <td className="whitespace-nowrap px-6 py-3.5 font-mono text-xs text-muted-foreground">
                         {formatTimestamp(log.timestamp)}
                       </td>
-                      <td className="px-6 py-3">
+                      <td className="px-6 py-3.5">
                         <LogLevelBadge level={log.logLevel} />
                       </td>
-                      <td className="px-6 py-3 font-medium">{log.applicationName}</td>
-                      <td className="max-w-md px-6 py-3 text-muted-foreground">{log.message}</td>
+                      <td className="px-6 py-3.5 font-medium">{log.applicationName}</td>
+                      <td className="max-w-md px-6 py-3.5 text-muted-foreground">{log.message}</td>
                     </tr>
                   ))
                 )}
@@ -246,33 +251,5 @@ export function LogsPage() {
         </CardContent>
       </Card>
     </div>
-  )
-}
-
-function StatCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string
-  value: number
-  tone?: 'info' | 'warning' | 'error'
-}) {
-  const toneClass =
-    tone === 'info'
-      ? 'text-blue-600'
-      : tone === 'warning'
-        ? 'text-amber-600'
-        : tone === 'error'
-          ? 'text-red-600'
-          : 'text-foreground'
-
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className={cn('text-3xl font-bold tabular-nums', toneClass)}>{value}</p>
-      </CardContent>
-    </Card>
   )
 }

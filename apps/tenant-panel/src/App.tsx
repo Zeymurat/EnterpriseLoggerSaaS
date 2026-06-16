@@ -9,7 +9,14 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { LogsPage } from '@/pages/LogsPage'
 import { UsersPage } from '@/pages/UsersPage'
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      retry: 1,
+    },
+  },
+})
 
 export default function App() {
   return (
