@@ -1,11 +1,23 @@
 import { getAccessToken } from '@/lib/auth'
 
+export interface TenantLoginOption {
+  tenantName: string
+  role: string
+  displayName?: string | null
+}
+
 export interface ApiResult<T> {
   data: T | null
   isSuccess: boolean
   errorMessage: string | null
   errorKind?: number
+  errorCode?: string | null
+  tenantOptions?: TenantLoginOption[] | null
 }
+
+export const AUTH_ERROR_CODES = {
+  ambiguousTenant: 'AmbiguousTenantContext',
+} as const
 
 export interface UserInfo {
   id: number
@@ -77,6 +89,16 @@ export class ApiError extends Error {
   }
 }
 
+export class AmbiguousTenantError extends ApiError {
+  constructor(
+    message: string,
+    public tenantOptions: TenantLoginOption[],
+  ) {
+    super(message, 400)
+    this.name = 'AmbiguousTenantError'
+  }
+}
+
 async function parseResult<T>(response: Response): Promise<T> {
   const body = (await response.json()) as ApiResult<T>
 
@@ -109,7 +131,25 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
     body: JSON.stringify(request),
   })
 
-  return parseResult<LoginResponse>(response)
+  const body = (await response.json()) as ApiResult<LoginResponse>
+
+  if (
+    !response.ok &&
+    body.errorCode === AUTH_ERROR_CODES.ambiguousTenant &&
+    body.tenantOptions &&
+    body.tenantOptions.length > 0
+  ) {
+    throw new AmbiguousTenantError(
+      body.errorMessage ?? 'Birden fazla şirket bulundu. Lütfen seçim yapın.',
+      body.tenantOptions,
+    )
+  }
+
+  if (!response.ok || !body.isSuccess || body.data === null) {
+    throw new ApiError(body.errorMessage ?? 'İstek başarısız.', response.status)
+  }
+
+  return body.data
 }
 
 export async function getLogs(): Promise<LogEntry[]> {

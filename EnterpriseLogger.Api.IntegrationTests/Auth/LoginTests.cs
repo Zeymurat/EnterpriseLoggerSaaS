@@ -74,7 +74,7 @@ public class LoginTests : IClassFixture<EnterpriseLoggerWebApplicationFactory>
     }
 
     [Fact]
-    public async Task Login_SameEmailMultipleTenants_RequiresTenantName()
+    public async Task Login_SameEmailMultipleTenants_ReturnsAmbiguousTenantWithList()
     {
         const string sharedEmail = "shared-login@test.com";
         const string password = "TestPass123";
@@ -88,13 +88,28 @@ public class LoginTests : IClassFixture<EnterpriseLoggerWebApplicationFactory>
             password
         });
 
-        Assert.Equal(HttpStatusCode.Unauthorized, withoutTenant.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, withoutTenant.StatusCode);
 
         using var failDoc = await withoutTenant.Content.ReadFromJsonAsync<JsonDocument>();
-        Assert.Contains(
-            "şirket adını",
-            failDoc!.RootElement.GetProperty("errorMessage").GetString(),
-            StringComparison.OrdinalIgnoreCase);
+        var root = failDoc!.RootElement;
+
+        Assert.Equal(
+            AuthErrorCodes.AmbiguousTenantContext,
+            root.GetProperty("errorCode").GetString());
+        Assert.False(root.GetProperty("isSuccess").GetBoolean());
+
+        var tenants = root.GetProperty("tenantOptions")
+            .EnumerateArray()
+            .Select(t => new
+            {
+                Name = t.GetProperty("tenantName").GetString(),
+                Role = t.GetProperty("role").GetString()
+            })
+            .ToList();
+
+        Assert.Equal(2, tenants.Count);
+        Assert.Contains(tenants, t => t.Name == "Alpha Corp" && t.Role == "Root");
+        Assert.Contains(tenants, t => t.Name == "Beta Corp" && t.Role == "Root");
 
         var withTenant = await _client.PostAsJsonAsync("/api/auth/login", new
         {

@@ -3,15 +3,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  AlertCircle,
-  RefreshCw,
-  Search,
-  Sparkles,
-  UserMinus,
-  UserPlus,
-  Shield,
-} from 'lucide-react'
+import { RefreshCw, Search, Shield, UserCheck, UserMinus, UserPlus, Users } from 'lucide-react'
 import {
   deactivateUser,
   getUsers,
@@ -28,9 +20,18 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, ConfirmDialog } from '@/components/ui/dialog'
 import { UserRoleBadge } from '@/components/users/UserRoleBadge'
-import { SimpleDialog } from '@/components/users/SimpleDialog'
+import {
+  AccessDeniedCard,
+  MockDataBanner,
+  PageHeader,
+  StatCard,
+} from '@/components/layout/PageShell'
 import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 
@@ -82,6 +83,7 @@ export function UsersPage() {
   const [roleFilter, setRoleFilter] = useState<RoleFilter>('All')
   const [inviteOpen, setInviteOpen] = useState(false)
   const [permissionsUser, setPermissionsUser] = useState<TenantUser | null>(null)
+  const [deactivateTarget, setDeactivateTarget] = useState<TenantUser | null>(null)
 
   const usersQuery = useQuery({
     queryKey: ['users'],
@@ -155,7 +157,7 @@ export function UsersPage() {
         duration: 20_000,
       })
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => toast.error('Davet başarısız', { description: err.message }),
   })
 
   const permissionsMutation = useMutation({
@@ -181,6 +183,7 @@ export function UsersPage() {
   const deactivateMutation = useMutation({
     mutationFn: (id: number) => deactivateUser(id),
     onSuccess: () => {
+      setDeactivateTarget(null)
       queryClient.invalidateQueries({ queryKey: ['users'] })
       toast.success('Kullanıcı pasife alındı')
     },
@@ -192,73 +195,71 @@ export function UsersPage() {
   const isRoot = currentUser?.role === 'Root'
 
   if (!can('users:read')) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-destructive" />
-            Erişim reddedildi
-          </CardTitle>
-          <CardDescription>
-            Kullanıcı listesi için <code className="text-xs">users:read</code> izni gerekir.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    )
+    return <AccessDeniedCard permission="users:read" />
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-          <p className="text-muted-foreground">Ekip üyelerini davet edin ve yönetin.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => usersQuery.refetch()}
-            disabled={useMockUsersOnly() || usersQuery.isFetching}
-          >
-            <RefreshCw className={cn('h-4 w-4', usersQuery.isFetching && 'animate-spin')} />
-            Yenile
-          </Button>
-          {canInvite && (
-            <Button size="sm" onClick={() => setInviteOpen(true)}>
-              <UserPlus className="h-4 w-4" />
-              Kullanıcı davet et
+      <PageHeader
+        title="Kullanıcılar"
+        description="Ekip üyelerini davet edin, rollerini ve izinlerini yönetin."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => usersQuery.refetch()}
+              disabled={useMockUsersOnly() || usersQuery.isFetching}
+            >
+              <RefreshCw className={cn('h-4 w-4', usersQuery.isFetching && 'animate-spin')} />
+              Yenile
             </Button>
-          )}
-        </div>
-      </div>
+            {canInvite && (
+              <Button size="sm" onClick={() => setInviteOpen(true)}>
+                <UserPlus className="h-4 w-4" />
+                Davet et
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {showingMockFallback && (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
-          <div>
-            <p className="font-medium">Demo kullanıcılar gösteriliyor</p>
-            <p className="text-amber-800/90">
-              {dataSource === 'mock-fallback'
-                ? 'Tenant\'ta yalnızca Root var — örnek Admin/User satırları eklendi. Davet ile gerçek kullanıcı ekleyebilirsiniz.'
-                : 'Mock mod veya API yüklenemedi — demo satırlar salt okunur.'}
-            </p>
-          </div>
-        </div>
+        <MockDataBanner
+          title="Demo kullanıcılar gösteriliyor"
+          description={
+            dataSource === 'mock-fallback'
+              ? "Tenant'ta yalnızca Root var — örnek satırlar eklendi. Davet ile gerçek kullanıcı ekleyebilirsiniz."
+              : 'Mock mod veya API yüklenemedi — demo satırlar salt okunur.'
+          }
+        />
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Toplam" value={displayUsers.length} />
-        <StatCard label="Aktif" value={displayUsers.filter((u) => u.isActive).length} />
-        <StatCard label="Admin" value={displayUsers.filter((u) => u.role === 'Admin').length} />
-        <StatCard label="User" value={displayUsers.filter((u) => u.role === 'User').length} />
+        <StatCard label="Toplam" value={displayUsers.length} icon={Users} />
+        <StatCard
+          label="Aktif"
+          value={displayUsers.filter((u) => u.isActive).length}
+          tone="success"
+          icon={UserCheck}
+        />
+        <StatCard
+          label="Admin"
+          value={displayUsers.filter((u) => u.role === 'Admin').length}
+          tone="info"
+        />
+        <StatCard
+          label="User"
+          value={displayUsers.filter((u) => u.role === 'User').length}
+          tone="violet"
+        />
       </div>
 
       <Card>
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <CardTitle className="text-lg">Kullanıcılar</CardTitle>
+              <CardTitle className="text-lg">Ekip listesi</CardTitle>
               <CardDescription>
                 {filteredUsers.length} / {displayUsers.length} kayıt
               </CardDescription>
@@ -273,8 +274,8 @@ export function UsersPage() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              <select
-                className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              <Select
+                className="min-w-[140px]"
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
               >
@@ -282,7 +283,7 @@ export function UsersPage() {
                 <option value="Root">Root</option>
                 <option value="Admin">Admin</option>
                 <option value="User">User</option>
-              </select>
+              </Select>
             </div>
           </div>
         </CardHeader>
@@ -290,7 +291,7 @@ export function UsersPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40 text-left text-muted-foreground">
+                <tr className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
                   <th className="px-6 py-3 font-medium">Kullanıcı</th>
                   <th className="px-6 py-3 font-medium">Rol</th>
                   <th className="px-6 py-3 font-medium">Durum</th>
@@ -310,11 +311,7 @@ export function UsersPage() {
                     isRoot={isRoot}
                     onEditPermissions={() => setPermissionsUser(u)}
                     onPromote={() => roleMutation.mutate({ id: u.id, role: 'Admin' })}
-                    onDeactivate={() => {
-                      if (confirm(`${u.email} pasife alınsın mı?`)) {
-                        deactivateMutation.mutate(u.id)
-                      }
-                    }}
+                    onDeactivate={() => setDeactivateTarget(u)}
                     isPending={
                       roleMutation.isPending ||
                       deactivateMutation.isPending ||
@@ -333,12 +330,14 @@ export function UsersPage() {
         onClose={() => setInviteOpen(false)}
         isRoot={isRoot}
         isSubmitting={inviteMutation.isPending}
-        onSubmit={(data) => inviteMutation.mutate({
-          email: data.email,
-          phone: data.phone,
-          role: data.role,
-          permissions: data.role === 'User' ? data.permissions : undefined,
-        })}
+        onSubmit={(data) =>
+          inviteMutation.mutate({
+            email: data.email,
+            phone: data.phone,
+            role: data.role,
+            permissions: data.role === 'User' ? data.permissions : undefined,
+          })
+        }
       />
 
       <EditPermissionsDialog
@@ -349,6 +348,21 @@ export function UsersPage() {
           if (!permissionsUser) return
           permissionsMutation.mutate({ id: permissionsUser.id, permissions })
         }}
+      />
+
+      <ConfirmDialog
+        open={deactivateTarget !== null}
+        onClose={() => setDeactivateTarget(null)}
+        onConfirm={() => deactivateTarget && deactivateMutation.mutate(deactivateTarget.id)}
+        title="Kullanıcıyı pasife al"
+        description={
+          deactivateTarget
+            ? `${deactivateTarget.email} hesabı pasife alınacak. Bu işlem geri alınabilir.`
+            : ''
+        }
+        confirmLabel="Pasife al"
+        variant="destructive"
+        isLoading={deactivateMutation.isPending}
       />
     </div>
   )
@@ -390,8 +404,8 @@ function UserRow({
   return (
     <tr
       className={cn(
-        'border-b transition-colors hover:bg-muted/20',
-        isMock && showingMock && 'bg-amber-50/40',
+        'border-b transition-colors hover:bg-muted/30',
+        isMock && showingMock && 'bg-amber-50/30',
         !user.isActive && 'opacity-60',
       )}
     >
@@ -403,66 +417,48 @@ function UserRow({
         <UserRoleBadge role={user.role} />
       </td>
       <td className="px-6 py-4">
-        <span
-          className={cn(
-            'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-            user.isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-muted text-muted-foreground',
-          )}
-        >
+        <Badge variant={user.isActive ? 'success' : 'muted'}>
           {user.isActive ? 'Aktif' : 'Pasif'}
-        </span>
+        </Badge>
       </td>
       <td className="max-w-xs px-6 py-4">
         <div className="flex flex-wrap gap-1">
           {permissionsDisplay.map((p) => (
-            <span
-              key={p}
-              className="rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
-            >
+            <Badge key={p} variant="outline" className="font-normal">
               {p}
-            </span>
+            </Badge>
           ))}
         </div>
       </td>
       <td className="px-6 py-4">
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap gap-1.5">
           {canManage && user.role === 'User' && user.isActive && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={actionsDisabled}
-              onClick={onEditPermissions}
-            >
+            <Button variant="outline" size="sm" disabled={actionsDisabled} onClick={onEditPermissions}>
               <Shield className="h-3.5 w-3.5" />
               İzinler
             </Button>
           )}
           {isRoot && user.role === 'User' && user.isActive && (
+            <Button variant="outline" size="sm" disabled={actionsDisabled} onClick={onPromote}>
+              Admin yap
+            </Button>
+          )}
+          {canManage && user.role !== 'Root' && user.isActive && !isSelf && (
             <Button
               variant="outline"
               size="sm"
               disabled={actionsDisabled}
-              onClick={onPromote}
+              onClick={onDeactivate}
+              className="text-destructive hover:text-destructive"
             >
-              Admin yap
+              <UserMinus className="h-3.5 w-3.5" />
+              Pasife al
             </Button>
           )}
-          {canManage &&
-            user.role !== 'Root' &&
-            user.isActive &&
-            !isSelf && (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={actionsDisabled}
-                onClick={onDeactivate}
-              >
-                <UserMinus className="h-3.5 w-3.5" />
-                Pasife al
-              </Button>
-            )}
           {isMock && showingMock && (
-            <span className="text-xs text-muted-foreground">Demo</span>
+            <Badge variant="warning" className="font-normal">
+              Demo
+            </Badge>
           )}
         </div>
       </td>
@@ -496,9 +492,7 @@ function InviteDialog({
   })
 
   useEffect(() => {
-    if (open) {
-      reset(INVITE_FORM_DEFAULTS)
-    }
+    if (open) reset(INVITE_FORM_DEFAULTS)
   }, [open, reset])
 
   const role = watch('role')
@@ -512,7 +506,7 @@ function InviteDialog({
   }
 
   return (
-    <SimpleDialog
+    <Dialog
       open={open}
       onClose={onClose}
       title="Kullanıcı davet et"
@@ -533,30 +527,29 @@ function InviteDialog({
 
         <div className="space-y-2">
           <Label htmlFor="invite-role">Rol</Label>
-          <select
-            id="invite-role"
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-            {...register('role')}
-          >
+          <Select id="invite-role" {...register('role')}>
             <option value="User">User</option>
             {isRoot && <option value="Admin">Admin</option>}
-          </select>
+          </Select>
         </div>
 
         {role === 'User' && (
           <div className="space-y-2">
             <Label>İzinler</Label>
-            <div className="space-y-2 rounded-md border p-3">
+            <div className="space-y-1 rounded-xl border bg-muted/20 p-2">
               {INVITE_PERMISSION_OPTIONS.map((p) => (
-                <label key={p.code} className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selectedPermissions.includes(p.code)}
-                    onChange={() => togglePermission(p.code)}
-                  />
-                  {p.label}
-                  <span className="text-xs text-muted-foreground">({p.code})</span>
-                </label>
+                <Checkbox
+                  key={p.code}
+                  id={`invite-${p.code}`}
+                  checked={selectedPermissions.includes(p.code)}
+                  onChange={() => togglePermission(p.code)}
+                  label={
+                    <span>
+                      {p.label}{' '}
+                      <span className="text-xs text-muted-foreground">({p.code})</span>
+                    </span>
+                  }
+                />
               ))}
             </div>
             {errors.permissions && (
@@ -574,7 +567,7 @@ function InviteDialog({
           </Button>
         </div>
       </form>
-    </SimpleDialog>
+    </Dialog>
   )
 }
 
@@ -603,54 +596,37 @@ function EditPermissionsDialog({
   }
 
   return (
-    <SimpleDialog
+    <Dialog
       open={user !== null}
       onClose={onClose}
       title="İzinleri güncelle"
       description={
-        user
-          ? `${user.email} — değişiklik JWT yenilenene kadar eski oturumda görünmez.`
-          : ''
+        user ? `${user.email} — değişiklik JWT yenilenene kadar eski oturumda görünmez.` : ''
       }
     >
       {user && (
         <div className="space-y-4">
-          <div className="space-y-2 rounded-md border p-3">
+          <div className="space-y-1 rounded-xl border bg-muted/20 p-2">
             {INVITE_PERMISSION_OPTIONS.map((p) => (
-              <label key={p.code} className="flex cursor-pointer items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={selected.includes(p.code)}
-                  onChange={() => toggle(p.code)}
-                />
-                {p.label}
-              </label>
+              <Checkbox
+                key={p.code}
+                id={`perm-${p.code}`}
+                checked={selected.includes(p.code)}
+                onChange={() => toggle(p.code)}
+                label={p.label}
+              />
             ))}
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>
               İptal
             </Button>
-            <Button
-              disabled={isSubmitting || selected.length === 0}
-              onClick={() => onSave(selected)}
-            >
+            <Button disabled={isSubmitting || selected.length === 0} onClick={() => onSave(selected)}>
               {isSubmitting ? 'Kaydediliyor...' : 'Kaydet'}
             </Button>
           </div>
         </div>
       )}
-    </SimpleDialog>
-  )
-}
-
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <p className="text-3xl font-bold tabular-nums">{value}</p>
-      </CardContent>
-    </Card>
+    </Dialog>
   )
 }

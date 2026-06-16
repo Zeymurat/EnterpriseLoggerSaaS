@@ -1,3 +1,4 @@
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Features.Auth.Commands;
 using EnterpriseLogger.Application.Features.Auth.Dtos;
@@ -27,6 +28,9 @@ public class AuthController : ControllerBase
 
         if (!result.IsSuccess)
         {
+            if (result.ErrorCode == AuthErrorCodes.AmbiguousTenantContext)
+                return BadRequest(result);
+
             if (result.ErrorMessage?.Contains("pasif", StringComparison.OrdinalIgnoreCase) == true)
                 return StatusCode(StatusCodes.Status403Forbidden, result);
 
