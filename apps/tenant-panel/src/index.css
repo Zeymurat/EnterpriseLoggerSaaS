@@ -50,4 +50,16 @@
   .panel-surface {
     @apply rounded-xl border bg-card shadow-sm;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    .motion-safe\:animate-in,
+    .motion-safe\:fade-in-0,
+    .motion-safe\:slide-in-from-right,
+    .motion-safe\:slide-in-from-left,
+    .motion-safe\:zoom-in-95,
+    .motion-reduce\:transition-none {
+      animation: none !important;
+      transition: none !important;
+    }
+  }
 }
