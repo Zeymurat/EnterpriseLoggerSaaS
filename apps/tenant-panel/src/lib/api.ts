@@ -77,6 +77,23 @@ export interface InviteUserResponse {
   temporaryPassword: string
 }
 
+export interface RegisterTenantRequest {
+  name: string
+  ownerEmail: string
+  ownerPhone: string
+  ownerPassword: string
+}
+
+export interface TenantRegistration {
+  id: number
+  name: string
+  apiKey: string
+  ownerEmail: string
+  ownerPhone: string
+  isActive: boolean
+  createdAt: string
+}
+
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5247'
 
 export class ApiError extends Error {
@@ -150,6 +167,16 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
   }
 
   return body.data
+}
+
+export async function registerTenant(request: RegisterTenantRequest): Promise<TenantRegistration> {
+  const response = await fetch(`${API_URL}/api/tenants`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
+
+  return parseResult<TenantRegistration>(response)
 }
 
 export async function getLogs(): Promise<LogEntry[]> {
