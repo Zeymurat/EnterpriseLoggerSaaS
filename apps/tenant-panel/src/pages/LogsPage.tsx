@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { LogLevelBadge } from '@/components/logs/LogLevelBadge'
+import { LogDetailSheet } from '@/components/logs/LogDetailSheet'
 import {
   AccessDeniedCard,
   EmptyState,
@@ -52,6 +53,7 @@ export function LogsPage() {
   const queryClient = useQueryClient()
   const [levelFilter, setLevelFilter] = useState<LevelFilter>('All')
   const [search, setSearch] = useState('')
+  const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null)
 
   const logsQuery = useQuery({
     queryKey: ['logs'],
@@ -229,8 +231,9 @@ export function LogsPage() {
                   filteredLogs.map((log) => (
                     <tr
                       key={log.id}
+                      onClick={() => setSelectedLog(log)}
                       className={cn(
-                        'border-b transition-colors hover:bg-muted/30',
+                        'cursor-pointer border-b transition-colors hover:bg-muted/30',
                         isMockLogEntry(log) && showingMockFallback && 'bg-amber-50/30',
                       )}
                     >
@@ -250,6 +253,8 @@ export function LogsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <LogDetailSheet log={selectedLog} onClose={() => setSelectedLog(null)} />
     </div>
   )
 }

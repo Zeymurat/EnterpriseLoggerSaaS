@@ -274,13 +274,50 @@ Send the tenant API key for machine integration, or a JWT from login for the adm
 
 **Create log example**
 
+Required fields: `applicationName`, `logLevel`, `message`. Optional request context (sent by the customer app):
+
 ```json
 {
-  "message": "Payment processed",
-  "logLevel": "Info",
-  "source": "BillingService"
+  "applicationName": "BillingService",
+  "logLevel": "Error",
+  "message": "Payment provider timeout after 30s",
+  "httpMethod": "POST",
+  "requestPath": "/api/checkout",
+  "statusCode": 504,
+  "correlationId": "req_8f2a1b",
+  "actorIdentifier": "customer@acme.com",
+  "exceptionType": "TimeoutException"
 }
 ```
+
+Context fields are optional — existing integrations that send only the three required fields keep working.
+
+**GET /api/logs** returns the same context fields on each item when present:
+
+```json
+{
+  "data": [
+    {
+      "id": 42,
+      "tenantId": 1,
+      "applicationName": "BillingService",
+      "logLevel": "Error",
+      "message": "Payment provider timeout after 30s",
+      "timestamp": "2026-06-04T14:30:00Z",
+      "httpMethod": "POST",
+      "requestPath": "/api/checkout",
+      "statusCode": 504,
+      "correlationId": "req_8f2a1b",
+      "actorIdentifier": "customer@acme.com",
+      "exceptionType": "TimeoutException"
+    }
+  ],
+  "isSuccess": true,
+  "errorMessage": null
+}
+```
+
+In the tenant panel, click a log row to open the **log detail sheet** (request type, URL, status, actor, correlation id, exception type when available).
 
 ### Error responses
 
@@ -347,6 +384,7 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 - [x] CORS for frontend clients
 - [x] Tenant panel skeleton (React + Vite + Tailwind)
 - [x] Logs & users UI in tenant panel
+- [x] Log request context fields + log detail sheet (tenant panel)
 - [ ] Redis for rate limits / quotas
 - [x] GitHub Actions CI (`build` + `test`)
 

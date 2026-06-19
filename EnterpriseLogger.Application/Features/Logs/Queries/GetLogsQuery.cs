@@ -38,7 +38,13 @@ public class GetLogsQuery
                 l.ApplicationName,
                 l.LogLevel,
                 l.Message,
-                l.Timestamp))
+                l.Timestamp,
+                l.HttpMethod,
+                l.RequestPath,
+                l.StatusCode,
+                l.CorrelationId,
+                l.ActorIdentifier,
+                l.ExceptionType))
             .ToListAsync(cancellationToken);
 
         return Result<IReadOnlyList<LogResponseDto>>.Success(logs);

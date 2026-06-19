@@ -1,4 +1,7 @@
 import { getAccessToken } from '@/lib/auth'
+import type { CreateLogRequest, LogEntry } from '@/types/log-entry'
+
+export type { CreateLogRequest, LogEntry } from '@/types/log-entry'
 
 export interface TenantLoginOption {
   tenantName: string
@@ -39,21 +42,6 @@ export interface LoginRequest {
   email: string
   password: string
   tenantName?: string
-}
-
-export interface LogEntry {
-  id: number
-  tenantId: number
-  applicationName: string
-  logLevel: string
-  message: string
-  timestamp: string
-}
-
-export interface CreateLogRequest {
-  applicationName: string
-  logLevel: string
-  message: string
 }
 
 export interface TenantUser {
