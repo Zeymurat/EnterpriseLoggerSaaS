@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, type SubmitErrorHandler, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Sheet } from '@/components/ui/sheet'
+import { toast } from '@/components/ui/sonner'
 import { INVITE_PERMISSION_OPTIONS } from '@/lib/permissions'
 
 const inviteSchema = z
@@ -53,10 +54,12 @@ export function InviteSheet({
 }: InviteSheetProps) {
   const {
     register,
+    control,
     handleSubmit,
     watch,
     setValue,
     reset,
+    clearErrors,
     formState: { errors },
   } = useForm<InviteFormValues>({
     resolver: zodResolver(inviteSchema),
@@ -70,11 +73,33 @@ export function InviteSheet({
   const role = watch('role')
   const selectedPermissions = watch('permissions')
 
+  const handleRoleChange = (next: InviteFormValues['role']) => {
+    setValue('role', next, { shouldValidate: true, shouldDirty: true })
+    if (next === 'Admin') {
+      setValue('permissions', [], { shouldValidate: true })
+      clearErrors('permissions')
+      return
+    }
+
+    setValue('permissions', ['logs:read'], { shouldValidate: true })
+    clearErrors('permissions')
+  }
+
   const togglePermission = (code: string) => {
     const next = selectedPermissions.includes(code)
       ? selectedPermissions.filter((p) => p !== code)
       : [...selectedPermissions, code]
     setValue('permissions', next, { shouldValidate: true })
+  }
+
+  const handleInvalidSubmit: SubmitErrorHandler<InviteFormValues> = (fieldErrors) => {
+    const message =
+      fieldErrors.email?.message ??
+      fieldErrors.phone?.message ??
+      fieldErrors.permissions?.message ??
+      'Lütfen formu kontrol edin'
+
+    toast.error('Davet formu geçersiz', { description: message })
   }
 
   return (
@@ -85,7 +110,7 @@ export function InviteSheet({
       description="Davet edilen kullanıcıya geçici şifre bir kez gösterilir."
       side="right"
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit, handleInvalidSubmit)} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="invite-email">E-posta</Label>
           <Input id="invite-email" type="email" {...register('email')} />
@@ -100,10 +125,21 @@ export function InviteSheet({
 
         <div className="space-y-2">
           <Label htmlFor="invite-role">Rol</Label>
-          <Select id="invite-role" {...register('role')}>
-            <option value="User">User</option>
-            {isRoot && <option value="Admin">Admin</option>}
-          </Select>
+          <Controller
+            name="role"
+            control={control}
+            render={({ field }) => (
+              <Select
+                id="invite-role"
+                value={field.value}
+                onChange={(e) => handleRoleChange(e.target.value as InviteFormValues['role'])}
+                onBlur={field.onBlur}
+              >
+                <option value="User">User</option>
+                {isRoot && <option value="Admin">Admin</option>}
+              </Select>
+            )}
+          />
         </div>
 
         {role === 'User' && (
