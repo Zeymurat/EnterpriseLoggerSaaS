@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { PageHeader, StatCard } from '@/components/layout/PageShell'
 import { LogLevelBadge } from '@/components/logs/LogLevelBadge'
 import { UserRoleBadge } from '@/components/users/UserRoleBadge'
+import { ApiKeyManagementCard } from '@/components/settings/ApiKeyManagementCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { permissionLabel } from '@/lib/permissions'
 
@@ -91,6 +92,8 @@ export function DashboardPage() {
         title={`Merhaba, ${user?.email.split('@')[0]}`}
         description={`${user?.tenantName} tenant'ına hoş geldiniz. İşte güncel özet.`}
       />
+
+      <ApiKeyManagementCard />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {isLoading ? (

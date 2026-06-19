@@ -19,12 +19,12 @@ public class LogTenantIsolationTests : IClassFixture<EnterpriseLoggerWebApplicat
     [Fact]
     public async Task GetLogs_ReturnsOnlyLogsForAuthenticatedTenant()
     {
-        var sahraKey = await CreateTenantAsync("Sahra Telekom");
-        var acmeKey = await CreateTenantAsync("Acme Corp");
+        var sahraKey = await CreateTenantWithApiKeyAsync("Sahra Telekom");
+        var acmeKey = await CreateTenantWithApiKeyAsync("Acme Corp");
 
-        await CreateLogAsync(sahraKey, "BillingApi", "Error", "Sahra log 1");
-        await CreateLogAsync(sahraKey, "BillingApi", "Warning", "Sahra log 2");
-        await CreateLogAsync(acmeKey, "InventoryApi", "Info", "Acme log 1");
+        await IntegrationTestAuth.CreateLogAsync(_client, sahraKey, "BillingApi", "Error", "Sahra log 1");
+        await IntegrationTestAuth.CreateLogAsync(_client, sahraKey, "BillingApi", "Warning", "Sahra log 2");
+        await IntegrationTestAuth.CreateLogAsync(_client, acmeKey, "InventoryApi", "Info", "Acme log 1");
 
         var sahraLogs = await GetLogsAsync(sahraKey);
         Assert.Equal(2, sahraLogs.Count);
@@ -39,38 +39,17 @@ public class LogTenantIsolationTests : IClassFixture<EnterpriseLoggerWebApplicat
     }
 
     [Fact]
-    public async Task CreateTenant_ShouldReturnServerGeneratedApiKey()
+    public async Task RotateApiKey_ShouldReturnServerGeneratedApiKey()
     {
-        var apiKey = await CreateTenantAsync("Zeymurat");
+        var apiKey = await CreateTenantWithApiKeyAsync("Zeymurat");
 
         Assert.StartsWith("EL_", apiKey);
         Assert.True(apiKey.Length >= 10);
     }
 
-    private async Task<string> CreateTenantAsync(string name)
+    private async Task<string> CreateTenantWithApiKeyAsync(string name)
     {
-        var ownerEmail = $"{Guid.NewGuid():N}@test.com";
-        var response = await _client.PostAsJsonAsync("/api/tenants", new
-        {
-            name,
-            ownerEmail,
-            ownerPhone = "05551234567",
-            ownerPassword = "TestPass123"
-        });
-        response.EnsureSuccessStatusCode();
-
-        using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        return doc!.RootElement.GetProperty("data").GetProperty("apiKey").GetString()!;
-    }
-
-    private async Task CreateLogAsync(string apiKey, string applicationName, string logLevel, string message)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
-        request.Headers.Add(TenantAuthConstants.ApiKeyHeaderName, apiKey);
-        request.Content = JsonContent.Create(new { applicationName, logLevel, message });
-
-        var response = await _client.SendAsync(request);
-        response.EnsureSuccessStatusCode();
+        return await IntegrationTestAuth.RegisterLoginAndRotateApiKeyAsync(_client, name);
     }
 
     private async Task<List<JsonElement>> GetLogsAsync(string apiKey)

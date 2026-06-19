@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Building2, Lock, Mail, Phone } from 'lucide-react'
-import { ApiError, registerTenant, type TenantRegistration } from '@/lib/api'
+import { ApiError, registerTenant } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,11 +24,11 @@ const registerSchema = z.object({
 export type RegisterFormValues = z.infer<typeof registerSchema>
 
 interface RegisterFormProps {
-  onSuccess: (result: TenantRegistration) => void
+  onRegistered: () => void
   onSwitchToLogin: () => void
 }
 
-export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) {
+export function RegisterForm({ onRegistered, onSwitchToLogin }: RegisterFormProps) {
   const [error, setError] = useState<string | null>(null)
 
   const {
@@ -49,9 +49,13 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
     setError(null)
 
     try {
-      const result = await registerTenant(values)
-      toast.success('Şirket kaydı oluşturuldu')
-      onSuccess(result)
+      await registerTenant(values)
+      toast.success('Şirket kaydı başarılı', {
+        description:
+          'Giriş yaptıktan sonra dashboard üzerinden API anahtarınızı üretebilirsiniz.',
+        duration: 8000,
+      })
+      onRegistered()
     } catch (err) {
       const message =
         err instanceof ApiError ? err.message : 'Kayıt tamamlanamadı. Lütfen tekrar deneyin.'

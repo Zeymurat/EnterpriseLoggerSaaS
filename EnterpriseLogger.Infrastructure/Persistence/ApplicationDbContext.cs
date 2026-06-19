@@ -30,7 +30,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
         modelBuilder.Entity<Tenant>(entity =>
         {
-            entity.HasIndex(t => t.ApiKey).IsUnique();
+            entity.HasIndex(t => t.ApiKeyHash)
+                .IsUnique()
+                .HasFilter("\"ApiKeyHash\" IS NOT NULL");
         });
 
         modelBuilder.Entity<User>(entity =>
@@ -98,6 +100,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             // TenantId çözülmemişse hiçbir log satırı dönmez (sızıntı önlemi).
             entity.HasQueryFilter(log =>
                 _tenantProvider.TenantId != null && log.TenantId == _tenantProvider.TenantId);
+
+            entity.HasIndex(log => new { log.TenantId, log.LogLevel, log.Timestamp });
         });
     }
 
