@@ -102,6 +102,12 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 _tenantProvider.TenantId != null && log.TenantId == _tenantProvider.TenantId);
 
             entity.HasIndex(log => new { log.TenantId, log.LogLevel, log.Timestamp });
+
+            entity.Property(l => l.HttpMethod).HasMaxLength(10);
+            entity.Property(l => l.RequestPath).HasMaxLength(500);
+            entity.Property(l => l.CorrelationId).HasMaxLength(64);
+            entity.Property(l => l.ActorIdentifier).HasMaxLength(256);
+            entity.Property(l => l.ExceptionType).HasMaxLength(256);
         });
     }
 

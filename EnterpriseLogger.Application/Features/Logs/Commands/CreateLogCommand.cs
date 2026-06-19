@@ -44,22 +44,35 @@ public class CreateLogCommand
             ApplicationName = request.ApplicationName.Trim(),
             LogLevel = NormalizeLogLevel(request.LogLevel),
             Message = request.Message.Trim(),
-            Timestamp = DateTime.UtcNow
+            Timestamp = DateTime.UtcNow,
+            HttpMethod = NormalizeOptional(request.HttpMethod)?.ToUpperInvariant(),
+            RequestPath = NormalizeOptional(request.RequestPath),
+            StatusCode = request.StatusCode,
+            CorrelationId = NormalizeOptional(request.CorrelationId),
+            ActorIdentifier = NormalizeOptional(request.ActorIdentifier),
+            ExceptionType = NormalizeOptional(request.ExceptionType),
         };
 
         _context.SystemLogs.Add(log);
         await _context.SaveChangesAsync(cancellationToken);
 
-        var response = new LogResponseDto(
+        return Result<LogResponseDto>.Success(MapToDto(log));
+    }
+
+    internal static LogResponseDto MapToDto(SystemLog log) =>
+        new(
             log.Id,
             log.TenantId,
             log.ApplicationName,
             log.LogLevel,
             log.Message,
-            log.Timestamp);
-
-        return Result<LogResponseDto>.Success(response);
-    }
+            log.Timestamp,
+            log.HttpMethod,
+            log.RequestPath,
+            log.StatusCode,
+            log.CorrelationId,
+            log.ActorIdentifier,
+            log.ExceptionType);
 
     private static string NormalizeLogLevel(string logLevel)
     {
@@ -67,11 +80,16 @@ public class CreateLogCommand
         return AllowedLogLevels.First(level =>
             level.Equals(trimmed, StringComparison.OrdinalIgnoreCase));
     }
+
+    private static string? NormalizeOptional(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
 public class CreateLogRequestValidator : AbstractValidator<CreateLogRequest>
 {
     private static readonly string[] AllowedLogLevels = ["Info", "Warning", "Error"];
+    private static readonly string[] AllowedHttpMethods =
+        ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 
     public CreateLogRequestValidator()
     {
@@ -87,5 +105,31 @@ public class CreateLogRequestValidator : AbstractValidator<CreateLogRequest>
         RuleFor(x => x.Message)
             .NotEmpty().WithMessage("Log mesajı boş olamaz.")
             .MaximumLength(4000).WithMessage("Log mesajı en fazla 4000 karakter olabilir.");
+
+        RuleFor(x => x.HttpMethod)
+            .MaximumLength(10)
+            .Must(method => method is null || AllowedHttpMethods.Contains(method.Trim().ToUpperInvariant()))
+            .WithMessage("HTTP metodu geçersiz.")
+            .When(x => !string.IsNullOrWhiteSpace(x.HttpMethod));
+
+        RuleFor(x => x.RequestPath)
+            .MaximumLength(500)
+            .When(x => !string.IsNullOrWhiteSpace(x.RequestPath));
+
+        RuleFor(x => x.CorrelationId)
+            .MaximumLength(64)
+            .When(x => !string.IsNullOrWhiteSpace(x.CorrelationId));
+
+        RuleFor(x => x.ActorIdentifier)
+            .MaximumLength(256)
+            .When(x => !string.IsNullOrWhiteSpace(x.ActorIdentifier));
+
+        RuleFor(x => x.ExceptionType)
+            .MaximumLength(256)
+            .When(x => !string.IsNullOrWhiteSpace(x.ExceptionType));
+
+        RuleFor(x => x.StatusCode)
+            .InclusiveBetween(100, 599)
+            .When(x => x.StatusCode.HasValue);
     }
 }
