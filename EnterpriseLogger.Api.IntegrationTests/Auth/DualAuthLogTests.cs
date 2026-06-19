@@ -24,10 +24,11 @@ public class DualAuthLogTests : IClassFixture<EnterpriseLoggerWebApplicationFact
         const string email = "jwt-logs@test.com";
         const string password = "TestPass123";
 
-        var apiKey = await RegisterAndGetApiKeyAsync(tenantName, email, password);
-        await CreateLogAsync(apiKey, "JwtApp", "Info", "JWT readable log");
+        var apiKey = await IntegrationTestAuth.RegisterLoginAndRotateApiKeyAsync(
+            _client, tenantName, email, password);
+        await IntegrationTestAuth.CreateLogAsync(_client, apiKey, "JwtApp", "Info", "JWT readable log");
 
-        var token = await LoginAsync(email, password);
+        var token = await IntegrationTestAuth.LoginAsync(_client, email, password);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -49,8 +50,8 @@ public class DualAuthLogTests : IClassFixture<EnterpriseLoggerWebApplicationFact
         const string email = "jwt-post@test.com";
         const string password = "TestPass123";
 
-        await RegisterTenantAsync("Jwt Post Corp", email, password);
-        var token = await LoginAsync(email, password);
+        await IntegrationTestAuth.RegisterTenantAsync(_client, "Jwt Post Corp", email, password);
+        var token = await IntegrationTestAuth.LoginAsync(_client, email, password);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -90,9 +91,9 @@ public class DualAuthLogTests : IClassFixture<EnterpriseLoggerWebApplicationFact
     [Fact]
     public async Task GetLogs_ApiKeyStillWorks_AfterDualAuth()
     {
-        var apiKey = await RegisterAndGetApiKeyAsync("ApiKey Still Works");
+        var apiKey = await IntegrationTestAuth.RegisterLoginAndRotateApiKeyAsync(_client, "ApiKey Still Works");
 
-        await CreateLogAsync(apiKey, "LegacyApp", "Info", "ApiKey log");
+        await IntegrationTestAuth.CreateLogAsync(_client, apiKey, "LegacyApp", "Info", "ApiKey log");
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs");
         request.Headers.Add(TenantAuthConstants.ApiKeyHeaderName, apiKey);
@@ -105,47 +106,5 @@ public class DualAuthLogTests : IClassFixture<EnterpriseLoggerWebApplicationFact
         var logs = doc!.RootElement.GetProperty("data").EnumerateArray().ToList();
 
         Assert.Single(logs);
-    }
-
-    private async Task<string> RegisterAndGetApiKeyAsync(
-        string name,
-        string? email = null,
-        string password = "TestPass123")
-    {
-        var response = await _client.PostAsJsonAsync("/api/tenants", new
-        {
-            name,
-            ownerEmail = email ?? $"{Guid.NewGuid():N}@test.com",
-            ownerPhone = "05551234567",
-            ownerPassword = password
-        });
-        response.EnsureSuccessStatusCode();
-
-        using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        return doc!.RootElement.GetProperty("data").GetProperty("apiKey").GetString()!;
-    }
-
-    private async Task RegisterTenantAsync(string name, string email, string password)
-    {
-        await RegisterAndGetApiKeyAsync(name, email, password);
-    }
-
-    private async Task<string> LoginAsync(string email, string password)
-    {
-        var response = await _client.PostAsJsonAsync("/api/auth/login", new { email, password });
-        response.EnsureSuccessStatusCode();
-
-        using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        return doc!.RootElement.GetProperty("data").GetProperty("accessToken").GetString()!;
-    }
-
-    private async Task CreateLogAsync(string apiKey, string applicationName, string logLevel, string message)
-    {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
-        request.Headers.Add(TenantAuthConstants.ApiKeyHeaderName, apiKey);
-        request.Content = JsonContent.Create(new { applicationName, logLevel, message });
-
-        var response = await _client.SendAsync(request);
-        response.EnsureSuccessStatusCode();
     }
 }

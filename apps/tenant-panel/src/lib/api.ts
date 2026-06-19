@@ -87,11 +87,14 @@ export interface RegisterTenantRequest {
 export interface TenantRegistration {
   id: number
   name: string
-  apiKey: string
   ownerEmail: string
   ownerPhone: string
   isActive: boolean
   createdAt: string
+}
+
+export interface RotateApiKeyResponse {
+  apiKey: string
 }
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5247'
@@ -177,6 +180,13 @@ export async function registerTenant(request: RegisterTenantRequest): Promise<Te
   })
 
   return parseResult<TenantRegistration>(response)
+}
+
+export async function rotateTenantApiKey(): Promise<RotateApiKeyResponse> {
+  const response = await authFetch('/api/tenants/me/api-key/rotate', {
+    method: 'POST',
+  })
+  return parseResult<RotateApiKeyResponse>(response)
 }
 
 export async function getLogs(): Promise<LogEntry[]> {

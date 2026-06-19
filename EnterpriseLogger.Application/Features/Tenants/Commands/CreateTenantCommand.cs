@@ -11,8 +11,6 @@ namespace EnterpriseLogger.Application.Features.Tenants.Commands;
 
 public class CreateTenantCommand
 {
-    private const int MaxApiKeyGenerationAttempts = 5;
-
     private readonly IApplicationDbContext _context;
     private readonly IValidator<CreateTenantRequest> _validator;
     private readonly IPasswordHasher _passwordHasher;
@@ -43,14 +41,10 @@ public class CreateTenantCommand
         if (!PhoneNormalizer.TryNormalize(request.OwnerPhone, out var ownerPhone))
             return Result<TenantResponseDto>.Failure("Validasyon hatası: Geçerli bir telefon numarası giriniz.");
 
-        var apiKey = await GenerateUniqueApiKeyAsync(cancellationToken);
-        if (apiKey is null)
-            return Result<TenantResponseDto>.Failure("API Key üretilemedi. Lütfen tekrar deneyin.");
-
         var tenant = new Tenant
         {
             Name = request.Name.Trim(),
-            ApiKey = apiKey,
+            ApiKeyHash = null,
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
@@ -81,28 +75,12 @@ public class CreateTenantCommand
         var response = new TenantResponseDto(
             tenant.Id,
             tenant.Name,
-            tenant.ApiKey,
             rootUser.Email,
             rootUser.Phone,
             tenant.IsActive,
             tenant.CreatedAt);
 
         return Result<TenantResponseDto>.Success(response);
-    }
-
-    private async Task<string?> GenerateUniqueApiKeyAsync(CancellationToken cancellationToken)
-    {
-        for (var attempt = 0; attempt < MaxApiKeyGenerationAttempts; attempt++)
-        {
-            var candidate = ApiKeyGenerator.Generate();
-            var exists = await _context.Tenants
-                .AnyAsync(t => t.ApiKey == candidate, cancellationToken);
-
-            if (!exists)
-                return candidate;
-        }
-
-        return null;
     }
 }
 

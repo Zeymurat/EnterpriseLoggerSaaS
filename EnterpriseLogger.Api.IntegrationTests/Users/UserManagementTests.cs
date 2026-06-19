@@ -264,7 +264,7 @@ public class UserManagementTests : IClassFixture<EnterpriseLoggerWebApplicationF
     [Fact]
     public async Task GetUsers_WithApiKey_ReturnsUnauthorized()
     {
-        var apiKey = await RegisterAndGetApiKeyAsync("ApiKey Users Corp");
+        var apiKey = await IntegrationTestAuth.RegisterLoginAndRotateApiKeyAsync(_client, "ApiKey Users Corp");
 
         using var request = new HttpRequestMessage(HttpMethod.Get, "/api/users");
         request.Headers.Add(TenantAuthConstants.ApiKeyHeaderName, apiKey);
@@ -273,20 +273,8 @@ public class UserManagementTests : IClassFixture<EnterpriseLoggerWebApplicationF
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    private async Task<string> RegisterAndGetApiKeyAsync(string name)
-    {
-        var response = await _client.PostAsJsonAsync("/api/tenants", new
-        {
-            name,
-            ownerEmail = $"{Guid.NewGuid():N}@test.com",
-            ownerPhone = "05551234567",
-            ownerPassword = "TestPass123"
-        });
-        response.EnsureSuccessStatusCode();
-
-        using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        return doc!.RootElement.GetProperty("data").GetProperty("apiKey").GetString()!;
-    }
+    private async Task<string> RegisterAndGetApiKeyAsync(string name) =>
+        await IntegrationTestAuth.RegisterLoginAndRotateApiKeyAsync(_client, name);
 
     private async Task<HttpResponseMessage> InviteUserRawAsync(
         string bearerToken,

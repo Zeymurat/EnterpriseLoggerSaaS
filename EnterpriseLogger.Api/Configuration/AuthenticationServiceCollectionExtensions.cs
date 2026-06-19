@@ -81,6 +81,7 @@ public static class AuthenticationServiceCollectionExtensions
             AddJwtPermissionPolicy(options, AuthPolicies.UsersRead, PermissionCodes.UsersRead, JwtBearerDefaults.AuthenticationScheme);
             AddJwtPermissionPolicy(options, AuthPolicies.UsersInvite, PermissionCodes.UsersInvite, JwtBearerDefaults.AuthenticationScheme);
             AddJwtPermissionPolicy(options, AuthPolicies.UsersManage, PermissionCodes.UsersManage, JwtBearerDefaults.AuthenticationScheme);
+            AddJwtPermissionPolicy(options, AuthPolicies.ApiKeysRotate, PermissionCodes.ApiKeysRotate, JwtBearerDefaults.AuthenticationScheme);
 
             options.AddPolicy(AuthPolicies.TenantRootOnly, policy =>
             {

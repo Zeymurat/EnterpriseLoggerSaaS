@@ -16,7 +16,7 @@ public class TenantRegistrationTests : IClassFixture<EnterpriseLoggerWebApplicat
     }
 
     [Fact]
-    public async Task CreateTenant_WithOwner_ReturnsApiKeyAndOwnerEmail()
+    public async Task CreateTenant_WithOwner_ReturnsMetadataWithoutApiKey()
     {
         const string ownerEmail = "root@acme.test";
         const string ownerPhone = "05551234567";
@@ -34,10 +34,24 @@ public class TenantRegistrationTests : IClassFixture<EnterpriseLoggerWebApplicat
         using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
         var data = doc!.RootElement.GetProperty("data");
 
-        Assert.StartsWith("EL_", data.GetProperty("apiKey").GetString());
+        Assert.False(data.TryGetProperty("apiKey", out _));
         Assert.Equal(ownerEmail, data.GetProperty("ownerEmail").GetString());
         Assert.Equal("+905551234567", data.GetProperty("ownerPhone").GetString());
         Assert.True(data.GetProperty("isActive").GetBoolean());
+    }
+
+    [Fact]
+    public async Task RotateApiKey_AfterLogin_ReturnsKeyOnce()
+    {
+        const string email = "rotate-root@acme.test";
+        const string password = "TestPass123";
+
+        await IntegrationTestAuth.RegisterTenantAsync(_client, "Rotate Corp", email, password);
+        var token = await IntegrationTestAuth.LoginAsync(_client, email, password);
+        var apiKey = await IntegrationTestAuth.RotateApiKeyAsync(_client, token);
+
+        Assert.StartsWith("EL_", apiKey);
+        Assert.True(apiKey.Length >= 10);
     }
 
     [Fact]

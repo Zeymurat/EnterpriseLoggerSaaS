@@ -48,6 +48,7 @@ else
 
 builder.Services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 builder.Services.AddScoped<IPasswordHasher, AspNetPasswordHasher>();
+builder.Services.AddSingleton<IApiKeyHasher, Sha256ApiKeyHasher>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenantProvider, HttpContextCurrentTenantProvider>();
@@ -57,6 +58,7 @@ builder.Services.AddDualAuthentication(builder.Environment);
 builder.Services.AddFrontendCors(builder.Configuration);
 
 builder.Services.AddScoped<CreateTenantCommand>();
+builder.Services.AddScoped<RotateTenantApiKeyCommand>();
 builder.Services.AddScoped<LoginCommand>();
 builder.Services.AddScoped<CreateLogCommand>();
 builder.Services.AddScoped<GetLogsQuery>();
