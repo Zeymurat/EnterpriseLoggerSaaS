@@ -326,7 +326,7 @@ In **Production**, Problem Details responses do **not** include stack traces or 
    feat(tenant): add tenant registration endpoint
    ```
 
-3. Open a **Pull Request** into `main`, run `dotnet test`, merge after review.
+3. Open a **Pull Request** into `main`. GitHub Actions runs **CI** automatically (`dotnet test` + tenant-panel `npm run build`). Merge after checks pass.
 
 `main` is the stable branch; avoid committing directly when working in a team setting.
 
@@ -345,9 +345,9 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 - [x] Tenant user management (invite, permissions, role, deactivate)
 - [x] CORS for frontend clients
 - [x] Tenant panel skeleton (React + Vite + Tailwind)
-- [ ] Logs & users UI in tenant panel
+- [x] Logs & users UI in tenant panel
 - [ ] Redis for rate limits / quotas
-- [ ] GitHub Actions CI (`build` + `test`)
+- [x] GitHub Actions CI (`build` + `test`)
 
 ---
 
