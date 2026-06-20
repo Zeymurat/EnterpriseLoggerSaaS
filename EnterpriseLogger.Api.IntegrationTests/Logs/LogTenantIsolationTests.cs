@@ -63,6 +63,6 @@ public class LogTenantIsolationTests : IClassFixture<EnterpriseLoggerWebApplicat
         using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
         var data = doc!.RootElement.GetProperty("data");
 
-        return data.EnumerateArray().Select(e => e.Clone()).ToList();
+        return data.GetProperty("items").EnumerateArray().Select(e => e.Clone()).ToList();
     }
 }

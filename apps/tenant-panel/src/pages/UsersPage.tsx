@@ -7,11 +7,9 @@ import {
   inviteUser,
   updateUserPermissions,
   updateUserRole,
-  useMockUsersOnly,
   type InviteUserRequest,
   type TenantUser,
 } from '@/lib/api'
-import { isMockUser, mergeWithMockUsers, MOCK_ADDITIONAL_USERS } from '@/lib/mock-users'
 import { INVITE_PERMISSION_OPTIONS, permissionLabel } from '@/lib/permissions'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -25,10 +23,11 @@ import { InviteSheet } from '@/components/users/InviteSheet'
 import { UserRoleBadge } from '@/components/users/UserRoleBadge'
 import {
   AccessDeniedCard,
-  MockDataBanner,
+  EmptyState,
   PageHeader,
   StatCard,
 } from '@/components/layout/PageShell'
+import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
 
@@ -59,63 +58,14 @@ export function UsersPage() {
   const usersQuery = useQuery({
     queryKey: ['users'],
     queryFn: getUsers,
-    enabled: can('users:read') && !useMockUsersOnly(),
+    enabled: can('users:read'),
   })
 
-  const { displayUsers, showingMockFallback, dataSource } = useMemo(() => {
-    if (useMockUsersOnly()) {
-      return {
-        displayUsers: [
-          {
-            id: 1,
-            email: currentUser?.email ?? 'root@demo.local',
-            phone: currentUser?.phone ?? '+905550000000',
-            role: 'Root',
-            isActive: true,
-            permissions: [],
-          },
-          ...MOCK_ADDITIONAL_USERS,
-        ],
-        showingMockFallback: true,
-        dataSource: 'mock' as const,
-      }
-    }
-
-    if (usersQuery.isLoading || usersQuery.isError) {
-      const fallbackRoot: TenantUser = {
-        id: currentUser?.id ?? 1,
-        email: currentUser?.email ?? 'root@demo.local',
-        phone: currentUser?.phone ?? '+905550000000',
-        role: currentUser?.role ?? 'Root',
-        isActive: true,
-        permissions: currentUser?.permissions ?? [],
-      }
-      return {
-        displayUsers: mergeWithMockUsers([fallbackRoot]),
-        showingMockFallback: true,
-        dataSource: 'mock' as const,
-      }
-    }
-
-    const apiUsers = usersQuery.data ?? []
-    if (apiUsers.length <= 1) {
-      return {
-        displayUsers: mergeWithMockUsers(apiUsers),
-        showingMockFallback: true,
-        dataSource: 'mock-fallback' as const,
-      }
-    }
-
-    return {
-      displayUsers: apiUsers,
-      showingMockFallback: false,
-      dataSource: 'api' as const,
-    }
-  }, [usersQuery.data, usersQuery.isLoading, usersQuery.isError, currentUser])
+  const users = usersQuery.data ?? []
 
   const filteredUsers = useMemo(
-    () => filterUsers(displayUsers, roleFilter, search),
-    [displayUsers, roleFilter, search],
+    () => filterUsers(users, roleFilter, search),
+    [users, roleFilter, search],
   )
 
   const inviteMutation = useMutation({
@@ -164,6 +114,8 @@ export function UsersPage() {
   const canInvite = can('users:invite')
   const canManage = can('users:manage')
   const isRoot = currentUser?.role === 'Root'
+  const isPending =
+    roleMutation.isPending || deactivateMutation.isPending || permissionsMutation.isPending
 
   if (!can('users:read')) {
     return <AccessDeniedCard permission="users:read" />
@@ -180,7 +132,7 @@ export function UsersPage() {
               variant="outline"
               size="sm"
               onClick={() => usersQuery.refetch()}
-              disabled={useMockUsersOnly() || usersQuery.isFetching}
+              disabled={usersQuery.isFetching}
             >
               <RefreshCw className={cn('h-4 w-4', usersQuery.isFetching && 'animate-spin')} />
               Yenile
@@ -195,35 +147,32 @@ export function UsersPage() {
         }
       />
 
-      {showingMockFallback && (
-        <MockDataBanner
-          title="Demo kullanıcılar gösteriliyor"
-          description={
-            dataSource === 'mock-fallback'
-              ? "Tenant'ta yalnızca Root var — örnek satırlar eklendi. Davet ile gerçek kullanıcı ekleyebilirsiniz."
-              : 'Mock mod veya API yüklenemedi — demo satırlar salt okunur.'
-          }
-        />
-      )}
-
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Toplam" value={displayUsers.length} icon={Users} />
-        <StatCard
-          label="Aktif"
-          value={displayUsers.filter((u) => u.isActive).length}
-          tone="success"
-          icon={UserCheck}
-        />
-        <StatCard
-          label="Admin"
-          value={displayUsers.filter((u) => u.role === 'Admin').length}
-          tone="info"
-        />
-        <StatCard
-          label="User"
-          value={displayUsers.filter((u) => u.role === 'User').length}
-          tone="violet"
-        />
+        {usersQuery.isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
+          ))
+        ) : (
+          <>
+            <StatCard label="Toplam" value={users.length} icon={Users} />
+            <StatCard
+              label="Aktif"
+              value={users.filter((u) => u.isActive).length}
+              tone="success"
+              icon={UserCheck}
+            />
+            <StatCard
+              label="Admin"
+              value={users.filter((u) => u.role === 'Admin').length}
+              tone="info"
+            />
+            <StatCard
+              label="User"
+              value={users.filter((u) => u.role === 'User').length}
+              tone="violet"
+            />
+          </>
+        )}
       </div>
 
       <Card>
@@ -232,7 +181,9 @@ export function UsersPage() {
             <div>
               <CardTitle className="text-lg">Ekip listesi</CardTitle>
               <CardDescription>
-                {filteredUsers.length} / {displayUsers.length} kayıt
+                {usersQuery.isLoading
+                  ? 'Yükleniyor...'
+                  : `${filteredUsers.length} / ${users.length} kayıt`}
               </CardDescription>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -243,12 +194,14 @@ export function UsersPage() {
                   placeholder="E-posta veya telefon ara..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  disabled={usersQuery.isLoading}
                 />
               </div>
               <Select
                 className="min-w-[140px]"
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value as RoleFilter)}
+                disabled={usersQuery.isLoading}
               >
                 <option value="All">Tüm roller</option>
                 <option value="Root">Root</option>
@@ -271,25 +224,47 @@ export function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((u) => (
-                  <UserRow
-                    key={u.id}
-                    user={u}
-                    currentUserId={currentUser?.id}
-                    isMock={isMockUser(u)}
-                    showingMock={showingMockFallback}
-                    canManage={canManage}
-                    isRoot={isRoot}
-                    onEditPermissions={() => setPermissionsUser(u)}
-                    onPromote={() => roleMutation.mutate({ id: u.id, role: 'Admin' })}
-                    onDeactivate={() => setDeactivateTarget(u)}
-                    isPending={
-                      roleMutation.isPending ||
-                      deactivateMutation.isPending ||
-                      permissionsMutation.isPending
-                    }
-                  />
-                ))}
+                {usersQuery.isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <tr key={i} className="border-b">
+                      <td colSpan={5} className="px-6 py-3">
+                        <Skeleton className="h-12 w-full" />
+                      </td>
+                    </tr>
+                  ))
+                ) : users.length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>
+                      <EmptyState
+                        title="Henüz kullanıcı yok"
+                        description="Root hesabı dışında ekip üyesi eklemek için Davet et butonunu kullanın."
+                      />
+                    </td>
+                  </tr>
+                ) : filteredUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5}>
+                      <EmptyState
+                        title="Filtreye uygun kullanıcı bulunamadı"
+                        description="Arama veya rol filtresini değiştirmeyi deneyin."
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  filteredUsers.map((u) => (
+                    <UserRow
+                      key={u.id}
+                      user={u}
+                      currentUserId={currentUser?.id}
+                      canManage={canManage}
+                      isRoot={isRoot}
+                      isPending={isPending}
+                      onEditPermissions={() => setPermissionsUser(u)}
+                      onPromote={() => roleMutation.mutate({ id: u.id, role: 'Admin' })}
+                      onDeactivate={() => setDeactivateTarget(u)}
+                    />
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -342,28 +317,23 @@ export function UsersPage() {
 function UserRow({
   user,
   currentUserId,
-  isMock,
-  showingMock,
   canManage,
   isRoot,
+  isPending,
   onEditPermissions,
   onPromote,
   onDeactivate,
-  isPending,
 }: {
   user: TenantUser
   currentUserId?: number
-  isMock: boolean
-  showingMock: boolean
   canManage: boolean
   isRoot: boolean
+  isPending: boolean
   onEditPermissions: () => void
   onPromote: () => void
   onDeactivate: () => void
-  isPending: boolean
 }) {
   const isSelf = user.id === currentUserId
-  const actionsDisabled = isMock || showingMock || isPending
 
   const permissionsDisplay =
     user.role === 'Root' || user.role === 'Admin'
@@ -376,7 +346,6 @@ function UserRow({
     <tr
       className={cn(
         'border-b transition-colors hover:bg-muted/30',
-        isMock && showingMock && 'bg-amber-50/30',
         !user.isActive && 'opacity-60',
       )}
     >
@@ -404,13 +373,13 @@ function UserRow({
       <td className="px-6 py-4">
         <div className="flex flex-wrap gap-1.5">
           {canManage && user.role === 'User' && user.isActive && (
-            <Button variant="outline" size="sm" disabled={actionsDisabled} onClick={onEditPermissions}>
+            <Button variant="outline" size="sm" disabled={isPending} onClick={onEditPermissions}>
               <Shield className="h-3.5 w-3.5" />
               İzinler
             </Button>
           )}
           {isRoot && user.role === 'User' && user.isActive && (
-            <Button variant="outline" size="sm" disabled={actionsDisabled} onClick={onPromote}>
+            <Button variant="outline" size="sm" disabled={isPending} onClick={onPromote}>
               Admin yap
             </Button>
           )}
@@ -418,18 +387,13 @@ function UserRow({
             <Button
               variant="outline"
               size="sm"
-              disabled={actionsDisabled}
+              disabled={isPending}
               onClick={onDeactivate}
               className="text-destructive hover:text-destructive"
             >
               <UserMinus className="h-3.5 w-3.5" />
               Pasife al
             </Button>
-          )}
-          {isMock && showingMock && (
-            <Badge variant="warning" className="font-normal">
-              Demo
-            </Badge>
           )}
         </div>
       </td>

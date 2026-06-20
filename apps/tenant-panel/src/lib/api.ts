@@ -1,7 +1,7 @@
 import { getAccessToken } from '@/lib/auth'
-import type { CreateLogRequest, LogEntry } from '@/types/log-entry'
+import type { CreateLogRequest, GetLogsParams, LogEntry, LogFilterOptions, LogListResponse } from '@/types/log-entry'
 
-export type { CreateLogRequest, LogEntry } from '@/types/log-entry'
+export type { CreateLogRequest, GetLogsParams, LogEntry, LogFilterOptions, LogLevelSummary, LogListResponse } from '@/types/log-entry'
 
 export interface TenantLoginOption {
   tenantName: string
@@ -177,9 +177,97 @@ export async function rotateTenantApiKey(): Promise<RotateApiKeyResponse> {
   return parseResult<RotateApiKeyResponse>(response)
 }
 
-export async function getLogs(): Promise<LogEntry[]> {
-  const response = await authFetch('/api/logs')
-  return parseResult<LogEntry[]>(response)
+function appendMany(searchParams: URLSearchParams, key: string, values?: string[]) {
+  values?.forEach((value) => {
+    if (value.trim()) searchParams.append(key, value.trim())
+  })
+}
+
+function appendManyNumbers(searchParams: URLSearchParams, key: string, values?: number[]) {
+  values?.forEach((value) => searchParams.append(key, String(value)))
+}
+
+function buildLogsSearchParams(params: GetLogsParams): URLSearchParams {
+  const searchParams = new URLSearchParams()
+
+  if (params.page) searchParams.set('page', String(params.page))
+  if (params.pageSize) searchParams.set('pageSize', String(params.pageSize))
+  appendMany(searchParams, 'logLevels', params.logLevels)
+  if (params.search?.trim()) searchParams.set('search', params.search.trim())
+  if (params.from) searchParams.set('from', params.from)
+  if (params.to) searchParams.set('to', params.to)
+  appendMany(searchParams, 'applicationNames', params.applicationNames)
+  appendMany(searchParams, 'httpMethods', params.httpMethods)
+  appendManyNumbers(searchParams, 'statusCodes', params.statusCodes)
+
+  return searchParams
+}
+
+function parseContentDispositionFileName(header: string | null): string | null {
+  if (!header) return null
+
+  const utf8Match = header.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match?.[1]) return decodeURIComponent(utf8Match[1])
+
+  const basicMatch = header.match(/filename="?([^";]+)"?/i)
+  return basicMatch?.[1] ?? null
+}
+
+export async function getLogFilterOptions(): Promise<LogFilterOptions> {
+  const response = await authFetch('/api/logs/filter-options')
+  return parseResult<LogFilterOptions>(response)
+}
+
+export async function getLogs(params: GetLogsParams = {}): Promise<LogListResponse> {
+  const query = buildLogsSearchParams(params).toString()
+  const path = query ? `/api/logs?${query}` : '/api/logs'
+  const response = await authFetch(path)
+  const data = await parseResult<LogListResponse>(response)
+
+  return {
+    ...data,
+    availableFilters: data.availableFilters ?? {
+      applicationNames: [],
+      httpMethods: [],
+      statusCodes: [],
+    },
+  }
+}
+
+export interface LogExportResult {
+  blob: Blob
+  fileName: string
+  exportedCount: number
+  totalMatching: number
+  truncated: boolean
+}
+
+export async function exportLogs(params: GetLogsParams = {}): Promise<LogExportResult> {
+  const query = buildLogsSearchParams(params).toString()
+  const path = query ? `/api/logs/export?${query}` : '/api/logs/export'
+  const response = await authFetch(path)
+
+    if (!response.ok) {
+      const contentType = response.headers.get('Content-Type') ?? ''
+      if (contentType.includes('application/json')) {
+        const body = (await response.json()) as ApiResult<unknown>
+        throw new ApiError(body.errorMessage ?? 'Dışa aktarma başarısız.', response.status)
+      }
+      throw new ApiError('Dışa aktarma başarısız.', response.status)
+    }
+
+  const blob = await response.blob()
+  const fileName =
+    parseContentDispositionFileName(response.headers.get('Content-Disposition')) ??
+    `logs-export-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`
+
+  return {
+    blob,
+    fileName,
+    exportedCount: Number(response.headers.get('X-Export-Count') ?? 0),
+    totalMatching: Number(response.headers.get('X-Export-Total-Matching') ?? 0),
+    truncated: response.headers.get('X-Export-Truncated') === 'true',
+  }
 }
 
 export async function createLog(request: CreateLogRequest): Promise<LogEntry> {
@@ -192,10 +280,6 @@ export async function createLog(request: CreateLogRequest): Promise<LogEntry> {
 
 export function getApiUrl(): string {
   return API_URL
-}
-
-export function useMockLogsOnly(): boolean {
-  return import.meta.env.VITE_USE_MOCK_LOGS === 'true'
 }
 
 export async function getUsers(): Promise<TenantUser[]> {
@@ -235,8 +319,4 @@ export async function deactivateUser(userId: number): Promise<TenantUser> {
     method: 'PATCH',
   })
   return parseResult<TenantUser>(response)
-}
-
-export function useMockUsersOnly(): boolean {
-  return import.meta.env.VITE_USE_MOCK_USERS === 'true'
 }

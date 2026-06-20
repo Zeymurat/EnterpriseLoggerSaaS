@@ -44,13 +44,13 @@ export function Dialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex min-h-[100dvh] w-full items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in-0"
+      className="fixed inset-0 z-[100] flex min-h-[100dvh] w-full items-center justify-center bg-[hsl(21_55%_11%_/0.55)] p-4 backdrop-blur-sm animate-in fade-in-0"
       onClick={onClose}
       role="presentation"
     >
       <div
         className={cn(
-          'max-h-[90vh] w-full max-w-lg overflow-hidden rounded-2xl border bg-background shadow-2xl animate-in zoom-in-95',
+          'relative overflow-hidden rounded-2xl border border-white/70 bg-background/90 shadow-2xl animate-in zoom-in-95',
           className,
         )}
         onClick={(e) => e.stopPropagation()}

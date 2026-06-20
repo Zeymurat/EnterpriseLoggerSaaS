@@ -99,7 +99,7 @@ export function BrandPanel({ mode, onSwitchMode, className }: BrandPanelProps) {
     >
       <div
         className={cn(
-          'absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_hsl(221_83%_53%_/_0.35),_transparent_55%)]',
+          'absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_hsl(21_96%_28%_/_0.45),_transparent_55%)]',
           'transition-opacity duration-700 ease-in-out motion-reduce:transition-none',
           isRegister ? 'opacity-0' : 'opacity-100',
         )}
@@ -107,7 +107,7 @@ export function BrandPanel({ mode, onSwitchMode, className }: BrandPanelProps) {
       />
       <div
         className={cn(
-          'absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_hsl(221_83%_53%_/_0.35),_transparent_55%)]',
+          'absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,_hsl(38_48%_60%_/_0.35),_transparent_55%)]',
           'transition-opacity duration-700 ease-in-out motion-reduce:transition-none',
           isRegister ? 'opacity-100' : 'opacity-0',
         )}

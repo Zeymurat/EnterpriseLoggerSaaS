@@ -6,11 +6,14 @@ using Microsoft.EntityFrameworkCore;
 namespace EnterpriseLogger.Application.Features.Logs.Queries;
 
 /// <summary>
-/// Tenant'a ait logları listeler.
+/// Tenant'a ait logları sayfalı listeler.
 /// Manuel TenantId filtresi yok — EF Core Global Query Filter devreye girer.
 /// </summary>
 public class GetLogsQuery
 {
+    public const int DefaultPageSize = 25;
+    public const int MaxPageSize = 100;
+
     private readonly IApplicationDbContext _context;
     private readonly ICurrentTenantProvider _tenantProvider;
 
@@ -20,18 +23,35 @@ public class GetLogsQuery
         _tenantProvider = tenantProvider;
     }
 
-    public async Task<Result<IReadOnlyList<LogResponseDto>>> ExecuteAsync(
+    public async Task<Result<LogListResponseDto>> ExecuteAsync(
+        GetLogsQueryParams parameters,
         CancellationToken cancellationToken = default)
     {
         if (!_tenantProvider.IsResolved)
         {
-            return Result<IReadOnlyList<LogResponseDto>>.Failure(
+            return Result<LogListResponseDto>.Failure(
                 "Tenant kimliği çözümlenemedi. X-Api-Key header gerekli.");
         }
 
-        var logs = await _context.SystemLogs
-            .AsNoTracking()
+        var page = parameters.Page < 1 ? 1 : parameters.Page;
+        var pageSize = parameters.PageSize < 1
+            ? DefaultPageSize
+            : Math.Min(parameters.PageSize, MaxPageSize);
+
+        var isDateFiltered = parameters.From.HasValue || parameters.To.HasValue;
+        var tenantQuery = _context.SystemLogs.AsNoTracking();
+        var filteredQuery = LogQueryFiltering.Apply(tenantQuery, parameters, includeDate: true);
+
+        var filteredSummary = await LogQueryFiltering.BuildSummaryAsync(filteredQuery, cancellationToken);
+        LogLevelSummaryDto? overallSummary = null;
+
+        if (isDateFiltered)
+            overallSummary = await LogQueryFiltering.BuildSummaryAsync(tenantQuery, cancellationToken);
+
+        var items = await filteredQuery
             .OrderByDescending(l => l.Timestamp)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(l => new LogResponseDto(
                 l.Id,
                 l.TenantId,
@@ -47,6 +67,16 @@ public class GetLogsQuery
                 l.ExceptionType))
             .ToListAsync(cancellationToken);
 
-        return Result<IReadOnlyList<LogResponseDto>>.Success(logs);
+        var availableFilters = await LogFilterOptionsLoader.LoadAsync(_context, cancellationToken);
+
+        return Result<LogListResponseDto>.Success(new LogListResponseDto(
+            items,
+            filteredSummary.Total,
+            page,
+            pageSize,
+            filteredSummary,
+            availableFilters,
+            overallSummary,
+            isDateFiltered));
     }
 }

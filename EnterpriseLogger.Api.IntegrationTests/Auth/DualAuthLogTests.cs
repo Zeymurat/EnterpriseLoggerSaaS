@@ -38,7 +38,7 @@ public class DualAuthLogTests : IClassFixture<EnterpriseLoggerWebApplicationFact
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        var logs = doc!.RootElement.GetProperty("data").EnumerateArray().ToList();
+        var logs = doc!.RootElement.GetProperty("data").GetProperty("items").EnumerateArray().ToList();
 
         Assert.Single(logs);
         Assert.Equal("JWT readable log", logs[0].GetProperty("message").GetString());
@@ -103,7 +103,7 @@ public class DualAuthLogTests : IClassFixture<EnterpriseLoggerWebApplicationFact
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
         using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        var logs = doc!.RootElement.GetProperty("data").EnumerateArray().ToList();
+        var logs = doc!.RootElement.GetProperty("data").GetProperty("items").EnumerateArray().ToList();
 
         Assert.Single(logs);
     }
