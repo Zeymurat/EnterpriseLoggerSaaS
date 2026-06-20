@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import type { TenantLoginOption } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthShell } from '@/components/auth/AuthShell'
@@ -12,6 +12,9 @@ export function AuthPage() {
   const { isAuthenticated } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const sessionExpired = searchParams.get('session') === 'expired'
+  const idleLogout = searchParams.get('reason') === 'idle'
 
   const initialMode: AuthMode = location.pathname === '/register' ? 'register' : 'login'
   const [mode, setMode] = useState<AuthMode>(initialMode)
@@ -53,6 +56,8 @@ export function AuthPage() {
         loginPanel={
           <div className="mx-auto w-full max-w-lg sm:max-w-xl lg:max-w-2xl rounded-2xl border bg-card p-8 shadow-sm sm:p-10 lg:border-0 lg:bg-transparent lg:p-0 lg:shadow-none">
             <LoginForm
+              sessionExpired={sessionExpired}
+              idleLogout={idleLogout}
               onAmbiguousTenant={handleAmbiguousTenant}
               onSwitchToRegister={() => switchMode('register')}
             />

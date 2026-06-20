@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { toast } from '@/components/ui/sonner'
 import type { TenantLoginOption } from '@/lib/api'
 
@@ -24,11 +25,18 @@ export interface PendingLogin {
 }
 
 interface LoginFormProps {
+  sessionExpired?: boolean
+  idleLogout?: boolean
   onAmbiguousTenant: (credentials: PendingLogin, options: TenantLoginOption[]) => void
   onSwitchToRegister: () => void
 }
 
-export function LoginForm({ onAmbiguousTenant, onSwitchToRegister }: LoginFormProps) {
+export function LoginForm({
+  sessionExpired = false,
+  idleLogout = false,
+  onAmbiguousTenant,
+  onSwitchToRegister,
+}: LoginFormProps) {
   const { login } = useAuth()
   const [error, setError] = useState<string | null>(null)
 
@@ -71,6 +79,17 @@ export function LoginForm({ onAmbiguousTenant, onSwitchToRegister }: LoginFormPr
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        {sessionExpired && (
+          <Alert variant="destructive">
+            <AlertTitle>{idleLogout ? 'Hareketsizlik nedeniyle oturum kapandı' : 'Oturum süresi doldu'}</AlertTitle>
+            <AlertDescription>
+              {idleLogout
+                ? 'Güvenlik nedeniyle oturumunuz sonlandırıldı. Kaldığınız yerden devam etmek için tekrar giriş yapın.'
+                : 'Güvenliğiniz için oturumunuz sonlandırıldı. Lütfen tekrar giriş yapın.'}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="login-email">E-posta</Label>
           <div className="relative">

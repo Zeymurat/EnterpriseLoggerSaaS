@@ -12,10 +12,12 @@ namespace EnterpriseLogger.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly LoginCommand _loginCommand;
+    private readonly RefreshSessionCommand _refreshSessionCommand;
 
-    public AuthController(LoginCommand loginCommand)
+    public AuthController(LoginCommand loginCommand, RefreshSessionCommand refreshSessionCommand)
     {
         _loginCommand = loginCommand;
+        _refreshSessionCommand = refreshSessionCommand;
     }
 
     [AllowAnonymous]
@@ -36,6 +38,27 @@ public class AuthController : ControllerBase
 
             if (result.ErrorMessage?.StartsWith("Validasyon", StringComparison.OrdinalIgnoreCase) == true)
                 return BadRequest(result);
+
+            return Unauthorized(result);
+        }
+
+        return Ok(result);
+    }
+
+    [Authorize(AuthenticationSchemes = Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)]
+    [HttpPost("refresh")]
+    public async Task<ActionResult<Result<LoginResponse>>> Refresh(CancellationToken cancellationToken)
+    {
+        var result = await _refreshSessionCommand.ExecuteAsync(cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.ErrorMessage?.Contains("Maksimum oturum", StringComparison.OrdinalIgnoreCase) == true
+                || result.ErrorMessage?.Contains("Oturum gerekli", StringComparison.OrdinalIgnoreCase) == true)
+                return Unauthorized(result);
+
+            if (result.ErrorMessage?.Contains("pasif", StringComparison.OrdinalIgnoreCase) == true)
+                return StatusCode(StatusCodes.Status403Forbidden, result);
 
             return Unauthorized(result);
         }

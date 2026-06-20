@@ -21,15 +21,20 @@ public class JwtTokenService : IJwtTokenService
         string email,
         int tenantId,
         string role,
-        IReadOnlyList<string> permissions)
+        IReadOnlyList<string> permissions,
+        DateTime sessionStartedAtUtc)
     {
         var expiresAt = DateTime.UtcNow.AddMinutes(_settings.AccessTokenExpiryMinutes);
+        var sessionStartedUnix = new DateTimeOffset(
+            DateTime.SpecifyKind(sessionStartedAtUtc, DateTimeKind.Utc)).ToUnixTimeSeconds();
+
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, userId.ToString()),
             new(ClaimTypes.Email, email),
             new(AuthClaimTypes.TenantId, tenantId.ToString()),
-            new(AuthClaimTypes.Role, role)
+            new(AuthClaimTypes.Role, role),
+            new(AuthClaimTypes.SessionStartedAt, sessionStartedUnix.ToString()),
         };
 
         claims.AddRange(permissions.Select(p => new Claim(AuthClaimTypes.Permission, p)));

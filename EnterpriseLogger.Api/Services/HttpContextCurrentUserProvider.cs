@@ -53,6 +53,18 @@ public class HttpContextCurrentUserProvider : ICurrentUserProvider
             .ToList()
         ?? [];
 
+    public DateTime? SessionStartedAtUtc
+    {
+        get
+        {
+            var raw = _httpContextAccessor.HttpContext?.User.FindFirstValue(AuthClaimTypes.SessionStartedAt);
+            if (string.IsNullOrWhiteSpace(raw) || !long.TryParse(raw, out var unixSeconds))
+                return null;
+
+            return DateTimeOffset.FromUnixTimeSeconds(unixSeconds).UtcDateTime;
+        }
+    }
+
     public bool IsAuthenticated =>
         _httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated == true;
 }

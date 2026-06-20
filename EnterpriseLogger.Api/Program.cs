@@ -60,6 +60,7 @@ builder.Services.AddFrontendCors(builder.Configuration);
 builder.Services.AddScoped<CreateTenantCommand>();
 builder.Services.AddScoped<RotateTenantApiKeyCommand>();
 builder.Services.AddScoped<LoginCommand>();
+builder.Services.AddScoped<RefreshSessionCommand>();
 builder.Services.AddScoped<CreateLogCommand>();
 builder.Services.AddScoped<GetLogsQuery>();
 builder.Services.AddScoped<ExportLogsQuery>();

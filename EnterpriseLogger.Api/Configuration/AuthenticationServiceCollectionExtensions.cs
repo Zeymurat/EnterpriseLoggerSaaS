@@ -4,6 +4,7 @@ using System.Text;
 using EnterpriseLogger.Api.Authentication;
 using EnterpriseLogger.Api.Authorization;
 using EnterpriseLogger.Application.Common.Constants;
+using EnterpriseLogger.Application.Common.Settings;
 using EnterpriseLogger.Infrastructure.Auth;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -22,6 +23,7 @@ public static class AuthenticationServiceCollectionExtensions
     {
         var settings = ResolveSettings(environment);
         services.AddSingleton(settings);
+        services.AddSingleton(new SessionSettings { MaxSessionHours = settings.MaxSessionHours });
 
         services.AddAuthentication(options =>
         {
@@ -110,7 +112,10 @@ public static class AuthenticationServiceCollectionExtensions
                 Audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "EnterpriseLogger.Api",
                 AccessTokenExpiryMinutes = ParseExpiryMinutes(
                     Environment.GetEnvironmentVariable("JWT_ACCESS_TOKEN_EXPIRY_MINUTES"),
-                    60)
+                    60),
+                MaxSessionHours = ParseMaxSessionHours(
+                    Environment.GetEnvironmentVariable("JWT_MAX_SESSION_HOURS"),
+                    8)
             };
         }
 
@@ -128,12 +133,18 @@ public static class AuthenticationServiceCollectionExtensions
             Audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? "EnterpriseLogger.Api",
             AccessTokenExpiryMinutes = ParseExpiryMinutes(
                 Environment.GetEnvironmentVariable("JWT_ACCESS_TOKEN_EXPIRY_MINUTES"),
-                60)
+                60),
+            MaxSessionHours = ParseMaxSessionHours(
+                Environment.GetEnvironmentVariable("JWT_MAX_SESSION_HOURS"),
+                8)
         };
     }
 
     private static int ParseExpiryMinutes(string? value, int defaultValue) =>
         int.TryParse(value, out var minutes) && minutes > 0 ? minutes : defaultValue;
+
+    private static int ParseMaxSessionHours(string? value, int defaultValue) =>
+        int.TryParse(value, out var hours) && hours > 0 ? hours : defaultValue;
 
     private static void AddJwtPermissionPolicy(
         AuthorizationOptions options,

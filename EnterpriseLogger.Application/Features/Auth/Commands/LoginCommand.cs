@@ -97,7 +97,8 @@ public class LoginCommand
             user.Email,
             user.TenantId,
             user.Role.ToString(),
-            permissions);
+            permissions,
+            DateTime.UtcNow);
 
         await UpdateLastLoginAsync(user.Id, cancellationToken);
 

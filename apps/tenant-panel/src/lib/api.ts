@@ -1,4 +1,6 @@
 import { getAccessToken } from '@/lib/auth'
+import { notifyUnauthorizedSession } from '@/lib/unauthorized-session'
+import { recordSessionActivity } from '@/lib/session-activity'
 import type { CreateLogRequest, GetLogsParams, LogEntry, LogFilterOptions, LogListResponse } from '@/types/log-entry'
 
 export type { CreateLogRequest, GetLogsParams, LogEntry, LogFilterOptions, LogLevelSummary, LogListResponse } from '@/types/log-entry'
@@ -131,6 +133,7 @@ async function parseResult<T>(response: Response): Promise<T> {
 async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = getAccessToken()
   if (!token) {
+    notifyUnauthorizedSession()
     throw new ApiError('Oturum gerekli. Lütfen tekrar giriş yapın.', 401)
   }
 
@@ -140,7 +143,11 @@ async function authFetch(path: string, options: RequestInit = {}): Promise<Respo
     headers.set('Content-Type', 'application/json')
   }
 
-  return apiFetch(`${API_URL}${path}`, { ...options, headers })
+  const response = await apiFetch(`${API_URL}${path}`, { ...options, headers })
+  if (response.status === 401) notifyUnauthorizedSession()
+  else if (response.ok) recordSessionActivity()
+
+  return response
 }
 
 export async function login(request: LoginRequest): Promise<LoginResponse> {
@@ -179,6 +186,11 @@ export async function registerTenant(request: RegisterTenantRequest): Promise<Te
   })
 
   return parseResult<TenantRegistration>(response)
+}
+
+export async function refreshSession(): Promise<LoginResponse> {
+  const response = await authFetch('/api/auth/refresh', { method: 'POST' })
+  return parseResult<LoginResponse>(response)
 }
 
 export async function rotateTenantApiKey(): Promise<RotateApiKeyResponse> {
@@ -292,6 +304,10 @@ export async function createLog(request: CreateLogRequest): Promise<LogEntry> {
 
 export function getApiUrl(): string {
   return API_URL
+}
+
+export function isUnauthorizedError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401
 }
 
 export async function getUsers(): Promise<TenantUser[]> {

@@ -9,5 +9,6 @@ public interface ICurrentUserProvider
     string? Email { get; }
     TenantUserRole? Role { get; }
     IReadOnlyList<string> Permissions { get; }
+    DateTime? SessionStartedAtUtc { get; }
     bool IsAuthenticated { get; }
 }

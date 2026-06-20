@@ -8,4 +8,5 @@ public class JwtSettings
     public string Issuer { get; init; } = "EnterpriseLogger";
     public string Audience { get; init; } = "EnterpriseLogger.Api";
     public int AccessTokenExpiryMinutes { get; init; } = 60;
+    public int MaxSessionHours { get; init; } = 8;
 }

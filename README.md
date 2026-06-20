@@ -178,6 +178,7 @@ dotnet test
 | `POST` | `/api/tenants` | — | Register a new tenant |
 | `POST` | `/api/tenants/me/api-key/rotate` | Bearer JWT (Root, `apikeys:rotate`) | Generate or rotate tenant API key (shown once) |
 | `POST` | `/api/auth/login` | — | Panel login (email + password → JWT) |
+| `POST` | `/api/auth/refresh` | Bearer JWT | Extend panel session (new access token, same `session_started_at` claim) |
 | `GET` | `/api/users` | Bearer JWT | List tenant users (`users:read`) |
 | `POST` | `/api/users/invite` | Bearer JWT | Invite Admin or User (`users:invite`) |
 | `PATCH` | `/api/users/{id}/permissions` | Bearer JWT | Update User role permissions (`users:manage`) |
@@ -213,6 +214,23 @@ dotnet test
 ```
 
 **Success:** `200 OK` with `accessToken`, `expiresIn`, and `user` (role, permissions). Use Swagger **Authorize → Bearer** to paste the token.
+
+### Panel session model (idle + refresh)
+
+The tenant panel uses **three independent timers** — do not confuse them:
+
+| Layer | Config | Default | Meaning |
+|-------|--------|---------|---------|
+| **Access token (JWT)** | `JWT_ACCESS_TOKEN_EXPIRY_MINUTES` (API `.env`) | 60 min | Crypto lifetime of each token. Renewed on login and on **refresh**. |
+| **Absolute max session** | `JWT_MAX_SESSION_HOURS` (API `.env`) | 8 h | Time since **first login** (`session_started_at` claim). After this, `/api/auth/refresh` returns 401 — user must log in again. |
+| **Idle timeout (UX)** | `VITE_SESSION_IDLE_MINUTES` (panel `.env`) | 15 min | No mouse/keyboard/scroll/touch and no successful authenticated API call → warning, then logout. |
+| **Idle warning** | `VITE_SESSION_WARN_MINUTES` (panel `.env`) | 2 min | How long before idle limit the *"Oturumu uzat"* dialog appears. |
+
+**Idle is not “15 minutes since login”.** Live log polling (`GET /api/logs` every 30s), page navigation, and filters all count as activity and reset the idle clock.
+
+**“Oturumu uzat”** calls `POST /api/auth/refresh` → new JWT (another `JWT_ACCESS_TOKEN_EXPIRY_MINUTES` window) while preserving `session_started_at` until `JWT_MAX_SESSION_HOURS` is reached.
+
+**401 handling:** expired or invalid JWT on any authenticated request → panel clears session and redirects to `/login?session=expired`.
 
 If the same email exists in multiple tenants and `tenantName` is omitted, the API returns **400 Bad Request** with `errorCode: "AmbiguousTenantContext"` and `tenantOptions` (tenant name + role per match). The tenant panel shows a picker and retries login with the selected `tenantName`:
 
@@ -363,11 +381,11 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 | Environment variables | Production / CI (`DB_CONNECTION_STRING`, `JWT_SECRET`, etc.) |
 | `appsettings.json` | Non-secret defaults only (connection string empty) |
 
-**JWT variables** (see `.env.example`): `JWT_SECRET` (min 32 chars), `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_ACCESS_TOKEN_EXPIRY_MINUTES`.
+**JWT variables** (see `.env.example`): `JWT_SECRET` (min 32 chars), `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_ACCESS_TOKEN_EXPIRY_MINUTES`, `JWT_MAX_SESSION_HOURS`.
 
 **CORS** (tenant panel): `CORS_ALLOWED_ORIGINS` — comma-separated origins; default `http://localhost:5173`.
 
-**Frontend** (`apps/tenant-panel/.env`): `VITE_API_URL=http://localhost:5247`
+**Frontend** (`apps/tenant-panel/.env`): `VITE_API_URL`, `VITE_SESSION_IDLE_MINUTES`, `VITE_SESSION_WARN_MINUTES` (see `apps/tenant-panel/.env.example`).
 
 ---
 
@@ -410,6 +428,7 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 - [x] Log request context fields + log detail sheet (tenant panel)
 - [x] Paginated log listing with filters, live time presets, CSV export (tenant panel)
 - [x] Empty state & error UX (onboarding card, API error card, network fallback)
+- [x] Idle session warning + JWT refresh (`POST /api/auth/refresh`)
 - [ ] Redis for rate limits / quotas
 - [x] GitHub Actions CI (`build` + `test`)
 

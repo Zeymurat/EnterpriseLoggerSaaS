@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import { login as apiLogin, type LoginRequest } from '@/lib/api'
+import { login as apiLogin, refreshSession as apiRefreshSession, type LoginRequest } from '@/lib/api'
 import {
   clearSession,
   getAccessToken,
@@ -8,6 +8,7 @@ import {
   saveSession,
   type AuthSession,
 } from '@/lib/auth'
+import { recordSessionActivity } from '@/lib/session-activity'
 import type { UserInfo } from '@/lib/api'
 
 interface AuthContextValue {
@@ -15,6 +16,7 @@ interface AuthContextValue {
   accessToken: string | null
   isAuthenticated: boolean
   login: (request: LoginRequest) => Promise<void>
+  refreshSession: () => Promise<void>
   logout: () => void
   can: (permission: string) => boolean
 }
@@ -37,6 +39,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     saveSession(next)
     setSession(next)
+    recordSessionActivity()
+  }, [])
+
+  const refreshSession = useCallback(async () => {
+    const response = await apiRefreshSession()
+    const next: AuthSession = {
+      accessToken: response.accessToken,
+      user: response.user,
+    }
+    saveSession(next)
+    setSession(next)
+    recordSessionActivity()
   }, [])
 
   const logout = useCallback(() => {
@@ -50,10 +64,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accessToken: session?.accessToken ?? null,
       isAuthenticated: session !== null,
       login,
+      refreshSession,
       logout,
       can: (permission: string) => hasPermission(session?.user ?? null, permission),
     }),
-    [session, login, logout],
+    [session, login, refreshSession, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

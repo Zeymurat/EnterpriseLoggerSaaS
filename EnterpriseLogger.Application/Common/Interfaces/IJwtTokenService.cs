@@ -7,7 +7,8 @@ public interface IJwtTokenService
         string email,
         int tenantId,
         string role,
-        IReadOnlyList<string> permissions);
+        IReadOnlyList<string> permissions,
+        DateTime sessionStartedAtUtc);
 }
 
 public record JwtTokenResult(string AccessToken, int ExpiresInSeconds);
