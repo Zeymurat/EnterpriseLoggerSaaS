@@ -23,7 +23,8 @@ public record LogResponseDto(
     int? StatusCode,
     string? CorrelationId,
     string? ActorIdentifier,
-    string? ExceptionType);
+    string? ExceptionType,
+    int? CorrelationLogCount = null);
 
 public record GetLogsQueryParams(
     int Page = 1,

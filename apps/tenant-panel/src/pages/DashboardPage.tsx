@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, RefreshCw, ScrollText, Users, UserCheck, Activity } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ApiErrorCard } from '@/components/layout/ApiErrorCard'
 import { EmptyState, PageHeader } from '@/components/layout/PageShell'
 import { LogLevelBadge } from '@/components/logs/LogLevelBadge'
+import { LogCorrelationTraceButton } from '@/components/logs/LogCorrelationTraceButton'
 import { LogDetailSheet } from '@/components/logs/LogDetailSheet'
 import { LogsOnboardingCard } from '@/components/logs/LogsOnboardingCard'
 import { LogsStatsGrid } from '@/components/logs/LogsStatsGrid'
@@ -18,6 +19,7 @@ import { ApiKeyManagementCard } from '@/components/settings/ApiKeyManagementCard
 import { Skeleton } from '@/components/ui/skeleton'
 import { permissionLabel } from '@/lib/permissions'
 import { isTenantWithoutLogs } from '@/lib/log-tenant-state'
+import { buildLogsTracePath } from '@/lib/logs-trace'
 import {
   createDefaultLogsFilters,
   isRelativeTimePreset,
@@ -59,6 +61,7 @@ function buildDashboardFilters(quickDate: QuickDatePreset) {
 
 export function DashboardPage() {
   const { user, can } = useAuth()
+  const navigate = useNavigate()
   const [quickDate, setQuickDate] = useState<QuickDatePreset>('today')
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null)
   const filters = useMemo(() => buildDashboardFilters(quickDate), [quickDate])
@@ -247,20 +250,30 @@ export function DashboardPage() {
               ) : (
                 <div className="space-y-2">
                   {logs.map((log) => (
-                    <button
+                    <div
                       key={log.id}
-                      type="button"
-                      onClick={() => setSelectedLog(log)}
-                      className="flex w-full items-start gap-3 rounded-xl border border-border/50 bg-card/60 px-4 py-3 text-left transition-colors hover:border-primary/20 hover:bg-primary/[0.04]"
+                      className="flex items-start gap-2 rounded-xl border border-border/50 bg-card/60 px-4 py-3 transition-colors hover:border-primary/20 hover:bg-primary/[0.04]"
                     >
-                      <LogLevelBadge level={log.logLevel} />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{log.message}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {log.applicationName} · {formatTimestamp(log.timestamp)}
-                        </p>
-                      </div>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLog(log)}
+                        className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                      >
+                        <LogLevelBadge level={log.logLevel} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{log.message}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {log.applicationName} · {formatTimestamp(log.timestamp)}
+                          </p>
+                        </div>
+                      </button>
+                      <LogCorrelationTraceButton
+                        correlationId={log.correlationId ?? ''}
+                        correlationLogCount={log.correlationLogCount}
+                        onTrace={(correlationId) => navigate(buildLogsTracePath(correlationId))}
+                        className="mt-0.5"
+                      />
+                    </div>
                   ))}
                 </div>
               )}

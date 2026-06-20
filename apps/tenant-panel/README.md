@@ -37,6 +37,7 @@ Ensure API `CORS_ALLOWED_ORIGINS` includes `http://localhost:5173` (see root `.e
 | API unreachable / network error | `ApiErrorCard` with retry; `api.ts` throws `ApiError` status `0` via `apiFetch` |
 | Date range with no rows (but tenant has logs) | Empty state: *Seçili zaman aralığında log bulunamadı* |
 | Correlation trace from detail sheet | `/logs?correlationId=…` → trace banner + all-time filter |
+| Multi-log correlation chain in list | Rust `GitBranch` badge with count — one-click trace filter |
 
 Shared components live under `src/components/layout/` (`ApiErrorCard`, `EmptyState`), `src/components/logs/LogsOnboardingCard.tsx`, and `LogsTraceBanner.tsx`.
 

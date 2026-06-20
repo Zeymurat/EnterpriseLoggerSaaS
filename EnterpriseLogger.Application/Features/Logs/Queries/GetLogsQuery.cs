@@ -64,13 +64,23 @@ public class GetLogsQuery
                 l.StatusCode,
                 l.CorrelationId,
                 l.ActorIdentifier,
-                l.ExceptionType))
+                l.ExceptionType,
+                null))
             .ToListAsync(cancellationToken);
+
+        var correlationCounts = await LogQueryFiltering.CountCorrelationChainsAsync(
+            tenantQuery,
+            items.Select(item => item.CorrelationId),
+            cancellationToken);
+
+        var itemsWithTraceCounts = items
+            .Select(item => LogQueryFiltering.WithCorrelationLogCount(item, correlationCounts))
+            .ToList();
 
         var availableFilters = await LogFilterOptionsLoader.LoadAsync(_context, cancellationToken);
 
         return Result<LogListResponseDto>.Success(new LogListResponseDto(
-            items,
+            itemsWithTraceCounts,
             filteredSummary.Total,
             page,
             pageSize,

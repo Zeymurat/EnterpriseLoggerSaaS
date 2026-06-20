@@ -53,7 +53,8 @@ public class ExportLogsQuery
                 l.StatusCode,
                 l.CorrelationId,
                 l.ActorIdentifier,
-                l.ExceptionType))
+                l.ExceptionType,
+                null))
             .ToListAsync(cancellationToken);
 
         var csv = BuildCsv(logs);

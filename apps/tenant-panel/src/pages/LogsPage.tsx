@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Download, RefreshCw, Search } from 'lucide-react'
@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { ApiErrorCard } from '@/components/layout/ApiErrorCard'
 import { LogLevelBadge } from '@/components/logs/LogLevelBadge'
+import { LogCorrelationTraceButton } from '@/components/logs/LogCorrelationTraceButton'
 import { LogDetailSheet } from '@/components/logs/LogDetailSheet'
 import { LogExportScopeDialog, getQuickDateLabel } from '@/components/logs/LogExportScopeDialog'
 import { LogsOnboardingCard } from '@/components/logs/LogsOnboardingCard'
@@ -225,6 +226,23 @@ export function LogsPage() {
       setSearchParams(next, { replace: true })
     }
   }
+
+  const startTraceFilter = useCallback(
+    (correlationId: string) => {
+      const trimmed = correlationId.trim()
+      if (!trimmed) return
+
+      setFilters((current) => applyCorrelationTraceFilters(trimmed, current))
+      setSearch('')
+      setPage(1)
+      setSelectedLog(null)
+
+      const next = new URLSearchParams(searchParams)
+      next.set('correlationId', trimmed)
+      setSearchParams(next, { replace: true })
+    },
+    [searchParams, setSearchParams],
+  )
 
   const handleExport = async (scope: LogExportScope = 'screen') => {
     setIsExporting(true)
@@ -459,7 +477,16 @@ export function LogsPage() {
                         <LogLevelBadge level={log.logLevel} />
                       </td>
                       <td className="px-6 py-4 text-sm font-medium">{log.applicationName}</td>
-                      <td className="max-w-md px-6 py-4 text-sm text-muted-foreground">{log.message}</td>
+                      <td className="max-w-md px-6 py-4">
+                        <div className="flex items-start gap-2">
+                          <LogCorrelationTraceButton
+                            correlationId={log.correlationId ?? ''}
+                            correlationLogCount={log.correlationLogCount}
+                            onTrace={startTraceFilter}
+                          />
+                          <span className="min-w-0 text-sm text-muted-foreground">{log.message}</span>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}

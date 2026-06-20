@@ -11,6 +11,7 @@ export interface LogEntry {
   correlationId?: string | null
   actorIdentifier?: string | null
   exceptionType?: string | null
+  correlationLogCount?: number | null
 }
 
 export interface CreateLogRequest {

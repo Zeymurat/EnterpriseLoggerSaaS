@@ -81,6 +81,40 @@ internal static class LogQueryFiltering
         return query;
     }
 
+    public static async Task<Dictionary<string, int>> CountCorrelationChainsAsync(
+        IQueryable<SystemLog> tenantQuery,
+        IEnumerable<string?> correlationIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = correlationIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!.Trim())
+            .Distinct()
+            .ToList();
+
+        if (ids.Count == 0)
+            return new Dictionary<string, int>();
+
+        return await tenantQuery
+            .Where(log => log.CorrelationId != null && ids.Contains(log.CorrelationId))
+            .GroupBy(log => log.CorrelationId!)
+            .Select(group => new { group.Key, Count = group.Count() })
+            .ToDictionaryAsync(entry => entry.Key, entry => entry.Count, cancellationToken);
+    }
+
+    public static LogResponseDto WithCorrelationLogCount(
+        LogResponseDto item,
+        IReadOnlyDictionary<string, int> correlationCounts)
+    {
+        if (string.IsNullOrWhiteSpace(item.CorrelationId))
+            return item;
+
+        var correlationId = item.CorrelationId.Trim();
+        var count = correlationCounts.TryGetValue(correlationId, out var chainSize) ? chainSize : 0;
+
+        return item with { CorrelationLogCount = count > 1 ? count : null };
+    }
+
     public static async Task<LogLevelSummaryDto> BuildSummaryAsync(
         IQueryable<SystemLog> query,
         CancellationToken cancellationToken)

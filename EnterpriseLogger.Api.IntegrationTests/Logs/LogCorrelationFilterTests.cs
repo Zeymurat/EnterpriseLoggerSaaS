@@ -43,4 +43,32 @@ public class LogCorrelationFilterTests : IClassFixture<EnterpriseLoggerWebApplic
         var apps = items.Select(log => log.GetProperty("applicationName").GetString()).OrderBy(x => x).ToList();
         Assert.Equal(["AuthService", "BillingService", "DbService"], apps);
     }
+
+    [Fact]
+    public async Task GetLogs_WithSharedCorrelationId_ExposesCorrelationLogCountOnListItems()
+    {
+        const string traceId = "trace-list-count-001";
+        var apiKey = await IntegrationTestAuth.RegisterLoginAndRotateApiKeyAsync(_client, "Trace Count Corp");
+
+        await IntegrationTestAuth.CreateLogAsync(_client, apiKey, "AuthService", "Info", "Step 1", correlationId: traceId);
+        await IntegrationTestAuth.CreateLogAsync(_client, apiKey, "BillingService", "Warning", "Step 2", correlationId: traceId);
+        await IntegrationTestAuth.CreateLogAsync(_client, apiKey, "OtherApp", "Info", "Unrelated log");
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs?pageSize=10");
+        request.Headers.Add(TenantAuthConstants.ApiKeyHeaderName, apiKey);
+
+        var response = await _client.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+
+        using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
+        var items = doc!.RootElement.GetProperty("data").GetProperty("items").EnumerateArray().ToList();
+
+        var tracedItems = items
+            .Where(item => item.GetProperty("correlationId").GetString() == traceId)
+            .ToList();
+
+        Assert.Equal(2, tracedItems.Count);
+        Assert.All(tracedItems, item =>
+            Assert.Equal(2, item.GetProperty("correlationLogCount").GetInt32()));
+    }
 }
