@@ -205,6 +205,7 @@ function buildLogsSearchParams(params: GetLogsParams): URLSearchParams {
   if (params.pageSize) searchParams.set('pageSize', String(params.pageSize))
   appendMany(searchParams, 'logLevels', params.logLevels)
   if (params.search?.trim()) searchParams.set('search', params.search.trim())
+  if (params.correlationId?.trim()) searchParams.set('correlationId', params.correlationId.trim())
   if (params.from) searchParams.set('from', params.from)
   if (params.to) searchParams.set('to', params.to)
   appendMany(searchParams, 'applicationNames', params.applicationNames)

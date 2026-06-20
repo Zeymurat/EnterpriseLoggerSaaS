@@ -18,6 +18,7 @@ export type RelativeTimePreset = (typeof RELATIVE_TIME_PRESETS)[number]
 
 export interface LogsFilterState {
   searchInput: string
+  correlationId: string
   logLevels: string[]
   httpMethods: string[]
   statusCodes: string[]
@@ -100,6 +101,7 @@ export function createDefaultLogsFilters(): LogsFilterState {
   const today = formatLocalDate(new Date())
   return {
     searchInput: '',
+    correlationId: '',
     logLevels: [],
     httpMethods: [],
     statusCodes: [],
@@ -177,6 +179,7 @@ export function buildExportLogsParams(
 
   return {
     search,
+    correlationId: effectiveFilters.correlationId.trim() || undefined,
     logLevels: effectiveFilters.logLevels,
     httpMethods: effectiveFilters.httpMethods,
     statusCodes: effectiveFilters.statusCodes.map(Number),

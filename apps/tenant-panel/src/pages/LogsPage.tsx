@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight, Download, RefreshCw, Search } from 'lucide-react'
 import { exportLogs, getLogs, type LogEntry } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
@@ -13,6 +14,7 @@ import { LogDetailSheet } from '@/components/logs/LogDetailSheet'
 import { LogExportScopeDialog, getQuickDateLabel } from '@/components/logs/LogExportScopeDialog'
 import { LogsOnboardingCard } from '@/components/logs/LogsOnboardingCard'
 import { LogsStatsGrid } from '@/components/logs/LogsStatsGrid'
+import { LogsTraceBanner } from '@/components/logs/LogsTraceBanner'
 import { LogsFilterBar, type LogsFilterState, type QuickDatePreset } from '@/components/logs/LogsFilterBar'
 import {
   buildExportLogsParams,
@@ -24,6 +26,7 @@ import {
   type LogExportScope,
 } from '@/lib/log-date-filters'
 import { isTenantWithoutLogs } from '@/lib/log-tenant-state'
+import { applyCorrelationTraceFilters } from '@/lib/logs-trace'
 import { AccessDeniedCard, EmptyState, PageHeader } from '@/components/layout/PageShell'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -50,6 +53,7 @@ function buildGetLogsParams(
     page,
     pageSize,
     search,
+    correlationId: filters.correlationId.trim() || undefined,
     logLevels: filters.logLevels,
     httpMethods: filters.httpMethods,
     statusCodes: filters.statusCodes.map(Number),
@@ -62,6 +66,7 @@ function buildGetLogsParams(
 function isSameFilterState(a: LogsFilterState, b: LogsFilterState): boolean {
   return (
     a.searchInput === b.searchInput &&
+    a.correlationId === b.correlationId &&
     a.quickDate === b.quickDate &&
     a.fromDate === b.fromDate &&
     a.toDate === b.toDate &&
@@ -74,6 +79,7 @@ function isSameFilterState(a: LogsFilterState, b: LogsFilterState): boolean {
 
 export function LogsPage() {
   const { can } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const defaultFilters = useMemo(() => createDefaultLogsFilters(), [])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>(25)
@@ -83,6 +89,18 @@ export function LogsPage() {
   const [isExporting, setIsExporting] = useState(false)
   const [exportNotice, setExportNotice] = useState<string | null>(null)
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
+
+  useEffect(() => {
+    const correlationId = searchParams.get('correlationId')?.trim()
+    if (!correlationId) return
+
+    setFilters((current) => {
+      if (current.correlationId === correlationId) return current
+      return applyCorrelationTraceFilters(correlationId, current)
+    })
+    setSearch('')
+    setPage(1)
+  }, [searchParams])
 
   useEffect(() => {
     const timer = window.setTimeout(() => setSearch(filters.searchInput), 300)
@@ -100,6 +118,7 @@ export function LogsPage() {
     filters.fromDate,
     filters.toDate,
     filters.quickDate,
+    filters.correlationId,
     pageSize,
   ])
 
@@ -109,6 +128,7 @@ export function LogsPage() {
       page,
       pageSize,
       search,
+      filters.correlationId,
       filters.logLevels,
       filters.httpMethods,
       filters.statusCodes,
@@ -190,6 +210,20 @@ export function LogsPage() {
     setFilters(createDefaultLogsFilters())
     setSearch('')
     setExportNotice(null)
+    if (searchParams.has('correlationId')) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('correlationId')
+      setSearchParams(next, { replace: true })
+    }
+  }
+
+  const clearTraceFilter = () => {
+    setFilters((current) => ({ ...current, correlationId: '' }))
+    if (searchParams.has('correlationId')) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('correlationId')
+      setSearchParams(next, { replace: true })
+    }
   }
 
   const handleExport = async (scope: LogExportScope = 'screen') => {
@@ -253,12 +287,16 @@ export function LogsPage() {
 
     if (hasActiveFilters) {
       return {
-        title: 'Arama kriterlerine uygun log bulunamadı',
-        description: 'Filtreleri değiştirmeyi veya temizlemeyi deneyin.',
+        title: filters.correlationId
+          ? 'Bu izleme kimliği için log bulunamadı'
+          : 'Arama kriterlerine uygun log bulunamadı',
+        description: filters.correlationId
+          ? 'İzleme kimliğini kontrol edin veya izlemeyi kapatıp genel listeye dönün.'
+          : 'Filtreleri değiştirmeyi veya temizlemeyi deneyin.',
         icon: Search,
         action: (
           <Button variant="outline" size="sm" onClick={clearFilters}>
-            Filtreleri temizle
+            {filters.correlationId ? 'İzlemeyi kapat' : 'Filtreleri temizle'}
           </Button>
         ),
       }
@@ -268,7 +306,7 @@ export function LogsPage() {
       title: 'Seçili zaman aralığında log bulunamadı',
       description: 'Farklı bir zaman aralığı seçmeyi deneyin.',
     }
-  }, [tenantHasNoLogs, hasActiveFilters, clearFilters])
+  }, [tenantHasNoLogs, hasActiveFilters, clearFilters, filters.correlationId])
 
   if (!can('logs:read')) {
     return <AccessDeniedCard permission="logs:read" />
@@ -330,7 +368,11 @@ export function LogsPage() {
         />
       )}
 
-      {shouldUseLiveRefresh(filters.quickDate) && (
+      {filters.correlationId && (
+        <LogsTraceBanner correlationId={filters.correlationId} onClear={clearTraceFilter} />
+      )}
+
+      {shouldUseLiveRefresh(filters.quickDate) && !filters.correlationId && (
         <p className="text-xs text-muted-foreground">
           Canlı aralık seçili — liste 30 saniyede bir otomatik yenilenir.
         </p>

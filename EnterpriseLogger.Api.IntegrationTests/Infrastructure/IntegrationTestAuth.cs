@@ -77,7 +77,8 @@ public static class IntegrationTestAuth
         string logLevel,
         string message,
         string? httpMethod = null,
-        int? statusCode = null)
+        int? statusCode = null,
+        string? correlationId = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
         request.Headers.Add(TenantAuthConstants.ApiKeyHeaderName, apiKey);
@@ -88,6 +89,7 @@ public static class IntegrationTestAuth
             message,
             httpMethod,
             statusCode,
+            correlationId,
         });
 
         var response = await client.SendAsync(request);

@@ -57,6 +57,12 @@ internal static class LogQueryFiltering
             query = query.Where(l => l.Message.ToLower().Contains(term));
         }
 
+        if (!string.IsNullOrWhiteSpace(parameters.CorrelationId))
+        {
+            var correlationId = parameters.CorrelationId.Trim();
+            query = query.Where(l => l.CorrelationId == correlationId);
+        }
+
         if (includeDate)
         {
             if (parameters.From.HasValue)

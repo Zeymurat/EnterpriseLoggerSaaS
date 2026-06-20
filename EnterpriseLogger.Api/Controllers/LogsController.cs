@@ -54,6 +54,7 @@ public class LogsController : ControllerBase
         [FromQuery] string[]? applicationNames = null,
         [FromQuery] string[]? httpMethods = null,
         [FromQuery] int[]? statusCodes = null,
+        [FromQuery] string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
         var parameters = new GetLogsQueryParams(
@@ -65,7 +66,8 @@ public class LogsController : ControllerBase
             to,
             applicationNames,
             httpMethods,
-            statusCodes);
+            statusCodes,
+            correlationId);
 
         var result = await _getLogsQuery.ExecuteAsync(parameters, cancellationToken);
 
@@ -85,6 +87,7 @@ public class LogsController : ControllerBase
         [FromQuery] string[]? applicationNames = null,
         [FromQuery] string[]? httpMethods = null,
         [FromQuery] int[]? statusCodes = null,
+        [FromQuery] string? correlationId = null,
         CancellationToken cancellationToken = default)
     {
         var parameters = new GetLogsQueryParams(
@@ -96,7 +99,8 @@ public class LogsController : ControllerBase
             to,
             applicationNames,
             httpMethods,
-            statusCodes);
+            statusCodes,
+            correlationId);
 
         var result = await _exportLogsQuery.ExecuteAsync(parameters, cancellationToken);
 

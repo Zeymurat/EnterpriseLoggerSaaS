@@ -27,6 +27,7 @@ import {
   PageHeader,
   StatCard,
 } from '@/components/layout/PageShell'
+import { ApiErrorCard } from '@/components/layout/ApiErrorCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
@@ -146,6 +147,15 @@ export function UsersPage() {
           </>
         }
       />
+
+      {usersQuery.isError && (
+        <ApiErrorCard
+          title="Kullanıcı listesi yüklenemedi"
+          error={usersQuery.error}
+          onRetry={() => usersQuery.refetch()}
+          isRetrying={usersQuery.isFetching}
+        />
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {usersQuery.isLoading ? (

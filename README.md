@@ -304,6 +304,7 @@ Context fields are optional — existing integrations that send only the three r
 | `applicationNames` | One or more exact application names |
 | `httpMethods` | One or more HTTP methods (e.g. `GET`, `POST`) |
 | `statusCodes` | One or more HTTP status codes (e.g. `200`, `404`) |
+| `correlationId` | Exact match on request trace / correlation id |
 
 **GET /api/logs/export** returns a UTF-8 CSV of matching logs (same query params as list, without pagination). Up to **10,000** rows per export; response headers `X-Export-Count`, `X-Export-Total-Matching`, `X-Export-Truncated` indicate how many rows were exported.
 
@@ -339,6 +340,7 @@ In the tenant panel:
 - **Dashboard** uses the same time range selector and summary cards for the selected window.
 - Click a log row to open the **log detail sheet** (request type, URL, status, actor, correlation id, exception type when available).
 - **Empty & error UX:** new tenants with zero logs see an onboarding card (API key + integration docs). Filtered searches with no matches show a clear empty table state. API/network failures surface a reusable error card with retry — network outages map to a friendly *"Sunucuya ulaşılamadı"* message from the shared `apiFetch` layer (no Axios interceptors).
+- **Correlation trace:** log detail sheet → *İlişkili istekleri filtrele* opens `/logs?correlationId=…` and lists the full request chain (`GET /api/logs?correlationId=` exact match).
 
 ### Error responses
 

@@ -54,6 +54,7 @@ export interface GetLogsParams {
   pageSize?: number
   logLevels?: string[]
   search?: string
+  correlationId?: string
   from?: string
   to?: string
   applicationNames?: string[]

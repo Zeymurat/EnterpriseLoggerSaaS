@@ -34,7 +34,8 @@ public record GetLogsQueryParams(
     DateTime? To = null,
     IReadOnlyList<string>? ApplicationNames = null,
     IReadOnlyList<string>? HttpMethods = null,
-    IReadOnlyList<int>? StatusCodes = null);
+    IReadOnlyList<int>? StatusCodes = null,
+    string? CorrelationId = null);
 
 public record LogFilterOptionsDto(
     IReadOnlyList<string> ApplicationNames,

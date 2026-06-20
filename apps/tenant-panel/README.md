@@ -36,8 +36,9 @@ Ensure API `CORS_ALLOWED_ORIGINS` includes `http://localhost:5173` (see root `.e
 | Filters/search return zero rows | `EmptyState` in the log table with *"Arama kriterlerine uygun log bulunamadı"* |
 | API unreachable / network error | `ApiErrorCard` with retry; `api.ts` throws `ApiError` status `0` via `apiFetch` |
 | Date range with no rows (but tenant has logs) | Empty state: *Seçili zaman aralığında log bulunamadı* |
+| Correlation trace from detail sheet | `/logs?correlationId=…` → trace banner + all-time filter |
 
-Shared components live under `src/components/layout/` (`ApiErrorCard`, `EmptyState`) and `src/components/logs/LogsOnboardingCard.tsx`.
+Shared components live under `src/components/layout/` (`ApiErrorCard`, `EmptyState`), `src/components/logs/LogsOnboardingCard.tsx`, and `LogsTraceBanner.tsx`.
 
 ## Scripts
 

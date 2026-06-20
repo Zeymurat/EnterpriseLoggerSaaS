@@ -1,10 +1,12 @@
-import { Copy } from 'lucide-react'
+import { Copy, GitBranch } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { LogEntry } from '@/types/log-entry'
 import { LogLevelBadge } from '@/components/logs/LogLevelBadge'
 import { Button } from '@/components/ui/button'
 import { Sheet } from '@/components/ui/sheet'
 import { toast } from '@/components/ui/sonner'
+import { buildLogsTracePath } from '@/lib/logs-trace'
 
 function formatTimestamp(iso: string): string {
   return new Intl.DateTimeFormat('tr-TR', {
@@ -32,10 +34,18 @@ function DetailField({ label, children }: { label: string; children: ReactNode }
 }
 
 export function LogDetailSheet({ log, onClose }: LogDetailSheetProps) {
+  const navigate = useNavigate()
+
   const copyMessage = async () => {
     if (!log) return
     await navigator.clipboard.writeText(log.message)
     toast.success('Mesaj kopyalandı')
+  }
+
+  const openTraceFlow = () => {
+    if (!log?.correlationId) return
+    navigate(buildLogsTracePath(log.correlationId))
+    onClose()
   }
 
   return (
@@ -48,10 +58,18 @@ export function LogDetailSheet({ log, onClose }: LogDetailSheetProps) {
       className="max-w-lg"
       footer={
         log ? (
-          <Button type="button" variant="outline" size="sm" onClick={copyMessage}>
-            <Copy className="h-4 w-4" />
-            Mesajı kopyala
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {hasValue(log.correlationId) && (
+              <Button type="button" size="sm" onClick={openTraceFlow}>
+                <GitBranch className="h-4 w-4" />
+                İlişkili istekleri filtrele
+              </Button>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={copyMessage}>
+              <Copy className="h-4 w-4" />
+              Mesajı kopyala
+            </Button>
+          </div>
         ) : undefined
       }
     >
