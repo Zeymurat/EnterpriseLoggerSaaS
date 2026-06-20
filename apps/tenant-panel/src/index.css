@@ -4,27 +4,40 @@
 
 @layer base {
   :root {
-    --background: 210 25% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 221 83% 53%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 221 83% 53%;
-    --radius: 0.75rem;
-    --sidebar: 222 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-muted: 215 20% 65%;
+    /* Brand: #8B3103 rust · #eae0c8 cream */
+    --background: 42 38% 90%;
+    --foreground: 24 26% 11%;
+    --card: 40 50% 99%;
+    --card-foreground: 24 26% 11%;
+    --popover: 40 50% 99%;
+    --popover-foreground: 24 26% 11%;
+    --primary: 21 96% 28%;
+    --primary-foreground: 42 55% 97%;
+    --secondary: 38 28% 82%;
+    --secondary-foreground: 24 26% 14%;
+    --muted: 40 32% 93%;
+    --muted-foreground: 28 14% 44%;
+    --accent: 38 42% 78%;
+    --accent-foreground: 24 26% 11%;
+    --destructive: 4 62% 40%;
+    --destructive-foreground: 42 55% 97%;
+    --border: 36 22% 82%;
+    --input: 36 22% 84%;
+    --ring: 21 96% 28%;
+    --radius: 1rem;
+    --sidebar: 22 48% 10%;
+    --sidebar-foreground: 42 40% 94%;
+    --sidebar-muted: 32 18% 58%;
+    --status-info: 28 52% 38%;
+    --status-info-muted: 32 45% 93%;
+    --status-warning: 32 88% 36%;
+    --status-warning-muted: 40 80% 92%;
+    --status-success: 95 30% 32%;
+    --status-success-muted: 95 26% 92%;
+    --status-error: 4 58% 38%;
+    --status-error-muted: 4 50% 94%;
+    --status-accent: 21 48% 36%;
+    --status-accent-muted: 32 38% 92%;
   }
 
   * {
@@ -32,10 +45,11 @@
   }
 
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background font-sans text-foreground antialiased;
     background-image:
-      radial-gradient(ellipse 80% 50% at 50% -20%, hsl(221 83% 53% / 0.08), transparent),
-      radial-gradient(ellipse 60% 40% at 100% 0%, hsl(221 83% 53% / 0.05), transparent);
+      radial-gradient(ellipse 120% 80% at 100% -30%, hsl(21 96% 28% / 0.06), transparent 50%),
+      radial-gradient(ellipse 80% 60% at 0% 0%, hsl(38 48% 60% / 0.08), transparent 45%),
+      linear-gradient(180deg, hsl(42 38% 90%) 0%, hsl(40 35% 88%) 100%);
   }
 
   html,
@@ -46,9 +60,31 @@
   }
 }
 
+@layer components {
+  .glass-surface {
+    @apply rounded-2xl border border-white/60 bg-card/80 shadow-warm backdrop-blur-md;
+  }
+
+  .modern-input {
+    @apply h-11 rounded-xl border-input/80 bg-card px-3.5 text-sm shadow-sm transition-shadow placeholder:text-muted-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-0;
+  }
+
+  .data-table-head {
+    @apply border-b border-border/60 bg-muted/40 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground;
+  }
+
+  .data-table-row {
+    @apply border-b border-border/40 transition-colors last:border-0 hover:bg-primary/[0.03];
+  }
+}
+
 @layer utilities {
   .panel-surface {
-    @apply rounded-xl border bg-card shadow-sm;
+    @apply glass-surface;
+  }
+
+  .warm-card {
+    @apply relative overflow-hidden rounded-2xl border border-white/70 bg-card/90 shadow-warm backdrop-blur-sm transition-all duration-200 hover:shadow-warm-lg;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -61,5 +97,30 @@
       animation: none !important;
       transition: none !important;
     }
+  }
+
+  .date-input {
+    color-scheme: light;
+  }
+
+  .date-input-filled {
+    @apply text-foreground;
+  }
+
+  .date-input-empty {
+    @apply text-muted-foreground;
+  }
+
+  .date-input::-webkit-datetime-edit {
+    @apply text-foreground;
+  }
+
+  .date-input-empty::-webkit-datetime-edit {
+    @apply text-muted-foreground;
+  }
+
+  .date-input::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.65;
   }
 }

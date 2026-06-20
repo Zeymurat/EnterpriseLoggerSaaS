@@ -56,7 +56,7 @@ public class LogContextFieldsTests : IClassFixture<EnterpriseLoggerWebApplicatio
         listResponse.EnsureSuccessStatusCode();
 
         using var listDoc = await listResponse.Content.ReadFromJsonAsync<JsonDocument>();
-        var log = listDoc!.RootElement.GetProperty("data").EnumerateArray().Single();
+        var log = listDoc!.RootElement.GetProperty("data").GetProperty("items").EnumerateArray().Single();
 
         Assert.Equal("POST", log.GetProperty("httpMethod").GetString());
         Assert.Equal("/api/checkout", log.GetProperty("requestPath").GetString());

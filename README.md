@@ -184,7 +184,7 @@ dotnet test
 | `PATCH` | `/api/users/{id}/role` | Bearer JWT (Root) | Promote User → Admin |
 | `PATCH` | `/api/users/{id}/deactivate` | Bearer JWT | Deactivate user (`users:manage`) |
 | `POST` | `/api/logs` | `X-Api-Key` **or** `Bearer JWT` | Ingest a log entry (`Info`, `Warning`, `Error`) |
-| `GET` | `/api/logs` | `X-Api-Key` **or** `Bearer JWT` | List logs for the authenticated tenant |
+| `GET` | `/api/logs` | `X-Api-Key` **or** `Bearer JWT` | List logs for the authenticated tenant (paginated; query: `page`, `pageSize`, `logLevel`, `search`, `from`, `to`, `applicationName`) |
 
 ### Register tenant
 
@@ -292,32 +292,52 @@ Required fields: `applicationName`, `logLevel`, `message`. Optional request cont
 
 Context fields are optional — existing integrations that send only the three required fields keep working.
 
-**GET /api/logs** returns the same context fields on each item when present:
+**GET /api/logs** returns a paginated envelope. Each item includes context fields when present.
+
+| Query | Description |
+|-------|-------------|
+| `page` | Page number (default `1`) |
+| `pageSize` | Items per page (default `25`, max `100`) |
+| `logLevels` | `Info`, `Warning`, `Error` (repeat or multi-value) |
+| `search` | Case-insensitive match in **message** |
+| `from` / `to` | UTC timestamp range (inclusive). Supports full ISO datetimes for live windows (e.g. last 10 minutes) |
+| `applicationNames` | One or more exact application names |
+| `httpMethods` | One or more HTTP methods (e.g. `GET`, `POST`) |
+| `statusCodes` | One or more HTTP status codes (e.g. `200`, `404`) |
+
+**GET /api/logs/export** returns a UTF-8 CSV of matching logs (same query params as list, without pagination). Up to **10,000** rows per export; response headers `X-Export-Count`, `X-Export-Total-Matching`, `X-Export-Truncated` indicate how many rows were exported.
 
 ```json
 {
-  "data": [
-    {
-      "id": 42,
-      "tenantId": 1,
-      "applicationName": "BillingService",
-      "logLevel": "Error",
-      "message": "Payment provider timeout after 30s",
-      "timestamp": "2026-06-04T14:30:00Z",
-      "httpMethod": "POST",
-      "requestPath": "/api/checkout",
-      "statusCode": 504,
-      "correlationId": "req_8f2a1b",
-      "actorIdentifier": "customer@acme.com",
-      "exceptionType": "TimeoutException"
-    }
-  ],
+  "data": {
+    "items": [
+      {
+        "id": 42,
+        "applicationName": "BillingService",
+        "logLevel": "Error",
+        "message": "Payment provider timeout after 30s",
+        "timestamp": "2026-06-04T14:30:00Z",
+        "httpMethod": "POST",
+        "requestPath": "/api/checkout",
+        "statusCode": 504
+      }
+    ],
+    "totalCount": 250,
+    "page": 1,
+    "pageSize": 25,
+    "summary": { "total": 250, "info": 116, "warning": 95, "error": 39 },
+    "overallSummary": { "total": 250, "info": 116, "warning": 95, "error": 39 },
+    "isDateFiltered": true
+  },
   "isSuccess": true,
   "errorMessage": null
 }
 ```
 
-In the tenant panel, click a log row to open the **log detail sheet** (request type, URL, status, actor, correlation id, exception type when available).
+In the tenant panel:
+- **Logs** page supports live time presets (10m / 30m / 1h / 3h / 12h), date presets, CSV export, and auto-refresh on live presets.
+- **Dashboard** uses the same time range selector and summary cards for the selected window.
+- Click a log row to open the **log detail sheet** (request type, URL, status, actor, correlation id, exception type when available).
 
 ### Error responses
 
@@ -385,6 +405,7 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 - [x] Tenant panel skeleton (React + Vite + Tailwind)
 - [x] Logs & users UI in tenant panel
 - [x] Log request context fields + log detail sheet (tenant panel)
+- [x] Paginated log listing with filters, live time presets, CSV export (tenant panel)
 - [ ] Redis for rate limits / quotas
 - [x] GitHub Actions CI (`build` + `test`)
 

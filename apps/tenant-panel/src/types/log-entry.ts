@@ -24,3 +24,39 @@ export interface CreateLogRequest {
   actorIdentifier?: string
   exceptionType?: string
 }
+
+export interface LogLevelSummary {
+  total: number
+  info: number
+  warning: number
+  error: number
+}
+
+export interface LogListResponse {
+  items: LogEntry[]
+  totalCount: number
+  page: number
+  pageSize: number
+  summary: LogLevelSummary
+  availableFilters: LogFilterOptions
+  overallSummary?: LogLevelSummary | null
+  isDateFiltered?: boolean
+}
+
+export interface LogFilterOptions {
+  applicationNames: string[]
+  httpMethods: string[]
+  statusCodes: number[]
+}
+
+export interface GetLogsParams {
+  page?: number
+  pageSize?: number
+  logLevels?: string[]
+  search?: string
+  from?: string
+  to?: string
+  applicationNames?: string[]
+  httpMethods?: string[]
+  statusCodes?: number[]
+}

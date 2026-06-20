@@ -1,25 +1,32 @@
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import {
-  AlertTriangle,
-  ArrowRight,
-  ScrollText,
-  Users,
-  UserCheck,
-  Activity,
-} from 'lucide-react'
+import { ArrowRight, RefreshCw, ScrollText, Users, UserCheck, Activity } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { getLogs, getUsers, useMockLogsOnly, useMockUsersOnly } from '@/lib/api'
-import { MOCK_LOG_ENTRIES } from '@/lib/mock-logs'
-import { mergeWithMockUsers } from '@/lib/mock-users'
+import { getLogs, getUsers, type LogEntry } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { PageHeader, StatCard } from '@/components/layout/PageShell'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { PageHeader } from '@/components/layout/PageShell'
 import { LogLevelBadge } from '@/components/logs/LogLevelBadge'
+import { LogDetailSheet } from '@/components/logs/LogDetailSheet'
+import { LogsStatsGrid } from '@/components/logs/LogsStatsGrid'
+import { LogsTimeRangeSelect } from '@/components/logs/LogsTimeRangeSelect'
 import { UserRoleBadge } from '@/components/users/UserRoleBadge'
 import { ApiKeyManagementCard } from '@/components/settings/ApiKeyManagementCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { permissionLabel } from '@/lib/permissions'
+import {
+  createDefaultLogsFilters,
+  isRelativeTimePreset,
+  quickDatePresetToRange,
+  resolveLogsDateFilter,
+  shouldUseLiveRefresh,
+  type QuickDatePreset,
+} from '@/lib/log-date-filters'
+import { cn } from '@/lib/utils'
+
+const LIVE_REFRESH_MS = 30_000
 
 function formatTimestamp(iso: string): string {
   return new Intl.DateTimeFormat('tr-TR', {
@@ -28,105 +35,152 @@ function formatTimestamp(iso: string): string {
   }).format(new Date(iso))
 }
 
+function buildDashboardFilters(quickDate: QuickDatePreset) {
+  const base = createDefaultLogsFilters()
+
+  if (quickDate === 'all') {
+    return { ...base, quickDate: 'all' as const, fromDate: '', toDate: '' }
+  }
+
+  if (isRelativeTimePreset(quickDate)) {
+    return { ...base, quickDate, fromDate: '', toDate: '' }
+  }
+
+  const range = quickDatePresetToRange(quickDate)
+  return {
+    ...base,
+    quickDate,
+    fromDate: range?.from ?? '',
+    toDate: range?.to ?? '',
+  }
+}
+
 export function DashboardPage() {
   const { user, can } = useAuth()
+  const [quickDate, setQuickDate] = useState<QuickDatePreset>('today')
+  const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null)
+  const filters = useMemo(() => buildDashboardFilters(quickDate), [quickDate])
 
   const logsQuery = useQuery({
-    queryKey: ['logs'],
-    queryFn: getLogs,
-    enabled: can('logs:read') && !useMockLogsOnly(),
+    queryKey: ['logs', 'dashboard', quickDate, filters.fromDate, filters.toDate],
+    queryFn: () => {
+      const resolved = resolveLogsDateFilter(filters)
+      return getLogs({
+        page: 1,
+        pageSize: 5,
+        from: resolved.apply ? resolved.from : undefined,
+        to: resolved.apply ? resolved.to : undefined,
+      })
+    },
+    enabled: can('logs:read'),
+    refetchInterval: shouldUseLiveRefresh(quickDate) ? LIVE_REFRESH_MS : false,
   })
 
   const usersQuery = useQuery({
     queryKey: ['users'],
     queryFn: getUsers,
-    enabled: can('users:read') && !useMockUsersOnly(),
+    enabled: can('users:read'),
   })
 
-  const logs = useMockLogsOnly()
-    ? MOCK_LOG_ENTRIES
-    : logsQuery.data?.length
-      ? logsQuery.data
-      : logsQuery.isLoading
-        ? []
-        : MOCK_LOG_ENTRIES
-
-  const users = useMockUsersOnly()
-    ? mergeWithMockUsers([
-        {
-          id: user?.id ?? 1,
-          email: user?.email ?? '',
-          phone: user?.phone ?? '',
-          role: user?.role ?? 'Root',
-          isActive: true,
-          permissions: user?.permissions ?? [],
-        },
-      ])
-    : usersQuery.data?.length
-      ? usersQuery.data
-      : usersQuery.isLoading
-        ? []
-        : mergeWithMockUsers([
-            {
-              id: user?.id ?? 1,
-              email: user?.email ?? '',
-              phone: user?.phone ?? '',
-              role: user?.role ?? 'Root',
-              isActive: true,
-              permissions: user?.permissions ?? [],
-            },
-          ])
-
-  const errorCount = logs.filter((l) => l.logLevel === 'Error').length
-  const warningCount = logs.filter((l) => l.logLevel === 'Warning').length
+  const logs = logsQuery.data?.items ?? []
+  const summary = logsQuery.data?.summary
+  const overallSummary = logsQuery.data?.overallSummary
+  const isDateFiltered = logsQuery.data?.isDateFiltered ?? false
+  const users = usersQuery.data ?? []
   const activeUsers = users.filter((u) => u.isActive).length
-  const recentLogs = [...logs]
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-    .slice(0, 5)
 
-  const isLoading = (can('logs:read') && logsQuery.isLoading) || (can('users:read') && usersQuery.isLoading)
+  const isLoading =
+    (can('logs:read') && logsQuery.isLoading) || (can('users:read') && usersQuery.isLoading)
 
   return (
     <div className="space-y-8">
       <PageHeader
         title={`Merhaba, ${user?.email.split('@')[0]}`}
         description={`${user?.tenantName} tenant'ına hoş geldiniz. İşte güncel özet.`}
+        actions={
+          can('logs:read') ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => logsQuery.refetch()}
+              disabled={logsQuery.isFetching}
+            >
+              <RefreshCw className={cn('h-4 w-4', logsQuery.isFetching && 'animate-spin')} />
+              Yenile
+            </Button>
+          ) : undefined
+        }
       />
 
       <ApiKeyManagementCard />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {can('logs:read') && (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0 space-y-1.5 sm:max-w-xs">
+              <p className="text-xs font-medium text-muted-foreground">Zaman aralığı</p>
+              <LogsTimeRangeSelect value={quickDate} onChange={setQuickDate} />
+            </div>
+            {shouldUseLiveRefresh(quickDate) && (
+              <p className="text-xs text-muted-foreground">Canlı aralık — 30 saniyede bir yenilenir.</p>
+            )}
+          </div>
+
+          {logsQuery.isError && (
+            <Alert variant="destructive">
+              <AlertTitle>Log özeti yüklenemedi</AlertTitle>
+              <AlertDescription>{(logsQuery.error as Error).message}</AlertDescription>
+            </Alert>
+          )}
+
+          <LogsStatsGrid
+            summary={summary}
+            overallSummary={overallSummary}
+            isDateFiltered={isDateFiltered}
+            isLoading={logsQuery.isLoading && !logsQuery.data}
+          />
+        </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2">
         {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
+          Array.from({ length: 2 }).map((_, i) => (
             <Skeleton key={i} className="h-28 rounded-xl" />
           ))
         ) : (
           <>
-            {can('logs:read') && (
-              <>
-                <StatCard label="Toplam log" value={logs.length} icon={ScrollText} />
-                <StatCard
-                  label="Hata"
-                  value={errorCount}
-                  tone="error"
-                  icon={AlertTriangle}
-                  hint={warningCount > 0 ? `${warningCount} uyarı` : undefined}
-                />
-              </>
-            )}
             {can('users:read') && (
               <>
-                <StatCard label="Kullanıcı" value={users.length} icon={Users} tone="violet" />
-                <StatCard
-                  label="Aktif kullanıcı"
-                  value={activeUsers}
-                  tone="success"
-                  icon={UserCheck}
-                />
+                <Card className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Kullanıcı</p>
+                      <p className="text-2xl font-semibold">{users.length}</p>
+                    </div>
+                    <Users className="h-8 w-8 text-status-accent" />
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Aktif kullanıcı</p>
+                      <p className="text-2xl font-semibold">{activeUsers}</p>
+                    </div>
+                    <UserCheck className="h-8 w-8 text-status-success" />
+                  </div>
+                </Card>
               </>
             )}
             {!can('logs:read') && !can('users:read') && (
-              <StatCard label="Oturum" value="Aktif" icon={Activity} tone="success" />
+              <Card className="p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Oturum</p>
+                    <p className="text-2xl font-semibold">Aktif</p>
+                  </div>
+                  <Activity className="h-8 w-8 text-status-success" />
+                </div>
+              </Card>
             )}
           </>
         )}
@@ -137,7 +191,7 @@ export function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <div>
               <CardTitle className="text-lg">Son loglar</CardTitle>
-              <CardDescription>En güncel 5 kayıt</CardDescription>
+              <CardDescription>Seçili aralıktaki en güncel 5 kayıt</CardDescription>
             </div>
             {can('logs:read') && (
               <Button variant="ghost" size="sm" asChild>
@@ -159,14 +213,18 @@ export function DashboardPage() {
                   <Skeleton key={i} className="h-12 w-full" />
                 ))}
               </div>
-            ) : recentLogs.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">Henüz log kaydı yok.</p>
+            ) : logs.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                Seçili zaman aralığında log kaydı yok.
+              </p>
             ) : (
               <div className="space-y-2">
-                {recentLogs.map((log) => (
-                  <div
+                {logs.map((log) => (
+                  <button
                     key={log.id}
-                    className="flex items-start gap-3 rounded-lg border bg-muted/20 px-4 py-3 transition-colors hover:bg-muted/40"
+                    type="button"
+                    onClick={() => setSelectedLog(log)}
+                    className="flex w-full items-start gap-3 rounded-xl border border-border/50 bg-card/60 px-4 py-3 text-left transition-colors hover:border-primary/20 hover:bg-primary/[0.04]"
                   >
                     <LogLevelBadge level={log.logLevel} />
                     <div className="min-w-0 flex-1">
@@ -175,7 +233,7 @@ export function DashboardPage() {
                         {log.applicationName} · {formatTimestamp(log.timestamp)}
                       </p>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
@@ -249,6 +307,8 @@ export function DashboardPage() {
           )}
         </div>
       </div>
+
+      <LogDetailSheet log={selectedLog} onClose={() => setSelectedLog(null)} />
     </div>
   )
 }

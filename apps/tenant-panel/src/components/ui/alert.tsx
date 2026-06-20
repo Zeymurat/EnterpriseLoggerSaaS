@@ -5,10 +5,10 @@ const alertVariants = cva('relative flex gap-3 rounded-xl border px-4 py-3 text-
   variants: {
     variant: {
       default: 'border-border bg-card text-foreground',
-      info: 'border-sky-200 bg-sky-50/80 text-sky-950',
-      warning: 'border-amber-200 bg-amber-50/80 text-amber-950',
+      info: 'border-status-info/30 bg-status-info-muted/80 text-foreground',
+      warning: 'border-status-warning/30 bg-status-warning-muted/80 text-foreground',
       destructive: 'border-destructive/30 bg-destructive/5 text-destructive',
-      success: 'border-emerald-200 bg-emerald-50/80 text-emerald-950',
+      success: 'border-status-success/30 bg-status-success-muted/80 text-foreground',
     },
   },
   defaultVariants: {

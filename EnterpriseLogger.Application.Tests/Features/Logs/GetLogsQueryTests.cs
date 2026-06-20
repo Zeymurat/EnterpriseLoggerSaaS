@@ -1,4 +1,5 @@
 using EnterpriseLogger.Application.Common.Interfaces;
+using EnterpriseLogger.Application.Features.Logs.Dtos;
 using EnterpriseLogger.Application.Features.Logs.Queries;
 using Moq;
 using Xunit;
@@ -17,7 +18,7 @@ public class GetLogsQueryTests
 
         var query = new GetLogsQuery(mockContext.Object, mockTenantProvider.Object);
 
-        var result = await query.ExecuteAsync();
+        var result = await query.ExecuteAsync(new GetLogsQueryParams());
 
         Assert.False(result.IsSuccess);
         Assert.Contains("Tenant kimliği çözümlenemedi", result.ErrorMessage);

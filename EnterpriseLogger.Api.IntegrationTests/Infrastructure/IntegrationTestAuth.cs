@@ -75,11 +75,20 @@ public static class IntegrationTestAuth
         string apiKey,
         string applicationName,
         string logLevel,
-        string message)
+        string message,
+        string? httpMethod = null,
+        int? statusCode = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/logs");
         request.Headers.Add(TenantAuthConstants.ApiKeyHeaderName, apiKey);
-        request.Content = JsonContent.Create(new { applicationName, logLevel, message });
+        request.Content = JsonContent.Create(new
+        {
+            applicationName,
+            logLevel,
+            message,
+            httpMethod,
+            statusCode,
+        });
 
         var response = await client.SendAsync(request);
         response.EnsureSuccessStatusCode();
