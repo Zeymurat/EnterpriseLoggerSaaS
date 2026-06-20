@@ -25,7 +25,7 @@ export function ApiKeyManagementCard() {
 
   return (
     <>
-      <Card>
+      <Card id="api-key-management">
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <KeyRound className="h-5 w-5 text-primary" />

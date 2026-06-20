@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Download, RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, RefreshCw, Search } from 'lucide-react'
 import { exportLogs, getLogs, type LogEntry } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { ApiErrorCard } from '@/components/layout/ApiErrorCard'
 import { LogLevelBadge } from '@/components/logs/LogLevelBadge'
 import { LogDetailSheet } from '@/components/logs/LogDetailSheet'
 import { LogExportScopeDialog, getQuickDateLabel } from '@/components/logs/LogExportScopeDialog'
+import { LogsOnboardingCard } from '@/components/logs/LogsOnboardingCard'
 import { LogsStatsGrid } from '@/components/logs/LogsStatsGrid'
 import { LogsFilterBar, type LogsFilterState, type QuickDatePreset } from '@/components/logs/LogsFilterBar'
 import {
@@ -21,6 +23,7 @@ import {
   shouldUseLiveRefresh,
   type LogExportScope,
 } from '@/lib/log-date-filters'
+import { isTenantWithoutLogs } from '@/lib/log-tenant-state'
 import { AccessDeniedCard, EmptyState, PageHeader } from '@/components/layout/PageShell'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -232,6 +235,41 @@ export function LogsPage() {
   const screenExportCount = totalCount
   const allExportCount = isDateFiltered ? (overallSummary?.total ?? totalCount) : totalCount
 
+  const logsDataReady = !!logsQuery.data && !logsQuery.isLoading
+  const tenantHasNoLogs = isTenantWithoutLogs(
+    summary,
+    overallSummary,
+    isDateFiltered,
+    logsDataReady,
+  )
+
+  const emptyTableState = useMemo(() => {
+    if (tenantHasNoLogs) {
+      return {
+        title: 'Kayıt tablosu boş',
+        description: 'İlk log gönderildiğinde kayıtlar burada listelenir.',
+      }
+    }
+
+    if (hasActiveFilters) {
+      return {
+        title: 'Arama kriterlerine uygun log bulunamadı',
+        description: 'Filtreleri değiştirmeyi veya temizlemeyi deneyin.',
+        icon: Search,
+        action: (
+          <Button variant="outline" size="sm" onClick={clearFilters}>
+            Filtreleri temizle
+          </Button>
+        ),
+      }
+    }
+
+    return {
+      title: 'Seçili zaman aralığında log bulunamadı',
+      description: 'Farklı bir zaman aralığı seçmeyi deneyin.',
+    }
+  }, [tenantHasNoLogs, hasActiveFilters, clearFilters])
+
   if (!can('logs:read')) {
     return <AccessDeniedCard permission="logs:read" />
   }
@@ -273,18 +311,24 @@ export function LogsPage() {
       )}
 
       {logsQuery.isError && (
-        <Alert variant="destructive">
-          <AlertTitle>API hatası</AlertTitle>
-          <AlertDescription>{(logsQuery.error as Error).message}</AlertDescription>
-        </Alert>
+        <ApiErrorCard
+          title="Loglar yüklenemedi"
+          error={logsQuery.error}
+          onRetry={() => logsQuery.refetch()}
+          isRetrying={logsQuery.isFetching}
+        />
       )}
 
-      <LogsStatsGrid
-        summary={summary}
-        overallSummary={overallSummary}
-        isDateFiltered={isDateFiltered}
-        isLoading={logsQuery.isLoading && !logsQuery.data}
-      />
+      {!logsQuery.isError && tenantHasNoLogs ? (
+        <LogsOnboardingCard />
+      ) : (
+        <LogsStatsGrid
+          summary={summary}
+          overallSummary={overallSummary}
+          isDateFiltered={isDateFiltered}
+          isLoading={logsQuery.isLoading && !logsQuery.data}
+        />
+      )}
 
       {shouldUseLiveRefresh(filters.quickDate) && (
         <p className="text-xs text-muted-foreground">
@@ -352,12 +396,10 @@ export function LogsPage() {
                   <tr>
                     <td colSpan={4}>
                       <EmptyState
-                        title="Kayıt bulunamadı"
-                        description={
-                          hasActiveFilters
-                            ? 'Filtreleri değiştirmeyi veya temizlemeyi deneyin.'
-                            : 'Müşteri uygulamanız API anahtarı ile POST /api/logs üzerinden log gönderebilir.'
-                        }
+                        title={emptyTableState.title}
+                        description={emptyTableState.description}
+                        icon={emptyTableState.icon}
+                        action={emptyTableState.action}
                       />
                     </td>
                   </tr>

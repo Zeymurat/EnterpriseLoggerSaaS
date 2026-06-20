@@ -28,6 +28,17 @@ Open **http://localhost:5173**
 
 Ensure API `CORS_ALLOWED_ORIGINS` includes `http://localhost:5173` (see root `.env.example`).
 
+## UX patterns
+
+| Situation | UI |
+|-----------|-----|
+| Tenant has never sent a log | `LogsOnboardingCard` on Dashboard and Logs (Rust/Cream card, sample `POST /api/logs`, doc link) |
+| Filters/search return zero rows | `EmptyState` in the log table with *"Arama kriterlerine uygun log bulunamadı"* |
+| API unreachable / network error | `ApiErrorCard` with retry; `api.ts` throws `ApiError` status `0` via `apiFetch` |
+| Date range with no rows (but tenant has logs) | Empty state: *Seçili zaman aralığında log bulunamadı* |
+
+Shared components live under `src/components/layout/` (`ApiErrorCard`, `EmptyState`) and `src/components/logs/LogsOnboardingCard.tsx`.
+
 ## Scripts
 
 | Command | Description |

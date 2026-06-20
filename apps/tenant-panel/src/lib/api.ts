@@ -87,6 +87,9 @@ export interface RotateApiKeyResponse {
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5247'
 
+export const NETWORK_ERROR_MESSAGE =
+  'Sunucuya ulaşılamadı. Lütfen az sonra tekrar deneyin.'
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -104,6 +107,14 @@ export class AmbiguousTenantError extends ApiError {
   ) {
     super(message, 400)
     this.name = 'AmbiguousTenantError'
+  }
+}
+
+async function apiFetch(url: string, options?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, options)
+  } catch {
+    throw new ApiError(NETWORK_ERROR_MESSAGE, 0)
   }
 }
 
@@ -129,11 +140,11 @@ async function authFetch(path: string, options: RequestInit = {}): Promise<Respo
     headers.set('Content-Type', 'application/json')
   }
 
-  return fetch(`${API_URL}${path}`, { ...options, headers })
+  return apiFetch(`${API_URL}${path}`, { ...options, headers })
 }
 
 export async function login(request: LoginRequest): Promise<LoginResponse> {
-  const response = await fetch(`${API_URL}/api/auth/login`, {
+  const response = await apiFetch(`${API_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -161,7 +172,7 @@ export async function login(request: LoginRequest): Promise<LoginResponse> {
 }
 
 export async function registerTenant(request: RegisterTenantRequest): Promise<TenantRegistration> {
-  const response = await fetch(`${API_URL}/api/tenants`, {
+  const response = await apiFetch(`${API_URL}/api/tenants`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -247,14 +258,14 @@ export async function exportLogs(params: GetLogsParams = {}): Promise<LogExportR
   const path = query ? `/api/logs/export?${query}` : '/api/logs/export'
   const response = await authFetch(path)
 
-    if (!response.ok) {
-      const contentType = response.headers.get('Content-Type') ?? ''
-      if (contentType.includes('application/json')) {
-        const body = (await response.json()) as ApiResult<unknown>
-        throw new ApiError(body.errorMessage ?? 'Dışa aktarma başarısız.', response.status)
-      }
-      throw new ApiError('Dışa aktarma başarısız.', response.status)
+  if (!response.ok) {
+    const contentType = response.headers.get('Content-Type') ?? ''
+    if (contentType.includes('application/json')) {
+      const body = (await response.json()) as ApiResult<unknown>
+      throw new ApiError(body.errorMessage ?? 'Dışa aktarma başarısız.', response.status)
     }
+    throw new ApiError('Dışa aktarma başarısız.', response.status)
+  }
 
   const blob = await response.blob()
   const fileName =

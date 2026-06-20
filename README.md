@@ -338,6 +338,7 @@ In the tenant panel:
 - **Logs** page supports live time presets (10m / 30m / 1h / 3h / 12h), date presets, CSV export, and auto-refresh on live presets.
 - **Dashboard** uses the same time range selector and summary cards for the selected window.
 - Click a log row to open the **log detail sheet** (request type, URL, status, actor, correlation id, exception type when available).
+- **Empty & error UX:** new tenants with zero logs see an onboarding card (API key + integration docs). Filtered searches with no matches show a clear empty table state. API/network failures surface a reusable error card with retry — network outages map to a friendly *"Sunucuya ulaşılamadı"* message from the shared `apiFetch` layer (no Axios interceptors).
 
 ### Error responses
 
@@ -386,7 +387,7 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 
 3. Open a **Pull Request** into `main`. GitHub Actions runs **CI** automatically (`dotnet test` + tenant-panel `npm run build`). Merge after checks pass.
 
-`main` is the stable branch; avoid committing directly when working in a team setting.
+`main` is the stable branch. Solo development may commit directly to `main`; PRs remain optional but useful as a CI checkpoint and history marker.
 
 ---
 
@@ -406,6 +407,7 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 - [x] Logs & users UI in tenant panel
 - [x] Log request context fields + log detail sheet (tenant panel)
 - [x] Paginated log listing with filters, live time presets, CSV export (tenant panel)
+- [x] Empty state & error UX (onboarding card, API error card, network fallback)
 - [ ] Redis for rate limits / quotas
 - [x] GitHub Actions CI (`build` + `test`)
 

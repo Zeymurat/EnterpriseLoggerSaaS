@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
+import { Inbox } from 'lucide-react'
 import type { SupportedLogLevelKey } from '@/lib/log-levels'
 import { getLogLevelStyle } from '@/lib/log-levels'
 import { cn } from '@/lib/utils'
@@ -137,13 +138,30 @@ export function AccessDeniedCard({
 interface EmptyStateProps {
   title: string
   description?: string
+  icon?: LucideIcon
+  action?: React.ReactNode
+  className?: string
 }
 
-export function EmptyState({ title, description }: EmptyStateProps) {
+export function EmptyState({
+  title,
+  description,
+  icon: Icon = Inbox,
+  action,
+  className,
+}: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+    <div
+      className={cn('flex flex-col items-center justify-center px-6 py-20 text-center', className)}
+    >
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <Icon className="h-6 w-6" />
+      </div>
       <p className="font-medium text-foreground">{title}</p>
-      {description && <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{description}</p>}
+      {description && (
+        <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">{description}</p>
+      )}
+      {action && <div className="mt-6">{action}</div>}
     </div>
   )
 }

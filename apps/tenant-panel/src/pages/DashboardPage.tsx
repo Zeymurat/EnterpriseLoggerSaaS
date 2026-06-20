@@ -6,16 +6,18 @@ import { useAuth } from '@/contexts/AuthContext'
 import { getLogs, getUsers, type LogEntry } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { PageHeader } from '@/components/layout/PageShell'
+import { ApiErrorCard } from '@/components/layout/ApiErrorCard'
+import { EmptyState, PageHeader } from '@/components/layout/PageShell'
 import { LogLevelBadge } from '@/components/logs/LogLevelBadge'
 import { LogDetailSheet } from '@/components/logs/LogDetailSheet'
+import { LogsOnboardingCard } from '@/components/logs/LogsOnboardingCard'
 import { LogsStatsGrid } from '@/components/logs/LogsStatsGrid'
 import { LogsTimeRangeSelect } from '@/components/logs/LogsTimeRangeSelect'
 import { UserRoleBadge } from '@/components/users/UserRoleBadge'
 import { ApiKeyManagementCard } from '@/components/settings/ApiKeyManagementCard'
 import { Skeleton } from '@/components/ui/skeleton'
 import { permissionLabel } from '@/lib/permissions'
+import { isTenantWithoutLogs } from '@/lib/log-tenant-state'
 import {
   createDefaultLogsFilters,
   isRelativeTimePreset,
@@ -92,6 +94,14 @@ export function DashboardPage() {
   const isLoading =
     (can('logs:read') && logsQuery.isLoading) || (can('users:read') && usersQuery.isLoading)
 
+  const logsDataReady = !!logsQuery.data && !logsQuery.isLoading
+  const tenantHasNoLogs = isTenantWithoutLogs(
+    summary,
+    overallSummary,
+    isDateFiltered,
+    logsDataReady,
+  )
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -116,29 +126,37 @@ export function DashboardPage() {
 
       {can('logs:read') && (
         <div className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div className="min-w-0 space-y-1.5 sm:max-w-xs">
-              <p className="text-xs font-medium text-muted-foreground">Zaman aralığı</p>
-              <LogsTimeRangeSelect value={quickDate} onChange={setQuickDate} />
-            </div>
-            {shouldUseLiveRefresh(quickDate) && (
-              <p className="text-xs text-muted-foreground">Canlı aralık — 30 saniyede bir yenilenir.</p>
-            )}
-          </div>
-
           {logsQuery.isError && (
-            <Alert variant="destructive">
-              <AlertTitle>Log özeti yüklenemedi</AlertTitle>
-              <AlertDescription>{(logsQuery.error as Error).message}</AlertDescription>
-            </Alert>
+            <ApiErrorCard
+              title="Log özeti yüklenemedi"
+              error={logsQuery.error}
+              onRetry={() => logsQuery.refetch()}
+              isRetrying={logsQuery.isFetching}
+            />
           )}
 
-          <LogsStatsGrid
-            summary={summary}
-            overallSummary={overallSummary}
-            isDateFiltered={isDateFiltered}
-            isLoading={logsQuery.isLoading && !logsQuery.data}
-          />
+          {!logsQuery.isError && tenantHasNoLogs && <LogsOnboardingCard />}
+
+          {!logsQuery.isError && !tenantHasNoLogs && (
+            <>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="min-w-0 space-y-1.5 sm:max-w-xs">
+                  <p className="text-xs font-medium text-muted-foreground">Zaman aralığı</p>
+                  <LogsTimeRangeSelect value={quickDate} onChange={setQuickDate} />
+                </div>
+                {shouldUseLiveRefresh(quickDate) && (
+                  <p className="text-xs text-muted-foreground">Canlı aralık — 30 saniyede bir yenilenir.</p>
+                )}
+              </div>
+
+              <LogsStatsGrid
+                summary={summary}
+                overallSummary={overallSummary}
+                isDateFiltered={isDateFiltered}
+                isLoading={logsQuery.isLoading && !logsQuery.data}
+              />
+            </>
+          )}
         </div>
       )}
 
@@ -186,61 +204,76 @@ export function DashboardPage() {
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <div>
-              <CardTitle className="text-lg">Son loglar</CardTitle>
-              <CardDescription>Seçili aralıktaki en güncel 5 kayıt</CardDescription>
-            </div>
-            {can('logs:read') && (
+      <div
+        className={cn(
+          'grid gap-6',
+          can('logs:read') && !tenantHasNoLogs ? 'lg:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-3',
+        )}
+      >
+        {can('logs:read') && !tenantHasNoLogs && (
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="text-lg">Son loglar</CardTitle>
+                <CardDescription>Seçili aralıktaki en güncel 5 kayıt</CardDescription>
+              </div>
               <Button variant="ghost" size="sm" asChild>
                 <Link to="/logs">
                   Tümünü gör
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
-            )}
-          </CardHeader>
-          <CardContent>
-            {!can('logs:read') ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                Log özeti için <code className="text-xs">logs:read</code> izni gerekir.
-              </p>
-            ) : isLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Skeleton key={i} className="h-12 w-full" />
-                ))}
-              </div>
-            ) : logs.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                Seçili zaman aralığında log kaydı yok.
-              </p>
-            ) : (
-              <div className="space-y-2">
-                {logs.map((log) => (
-                  <button
-                    key={log.id}
-                    type="button"
-                    onClick={() => setSelectedLog(log)}
-                    className="flex w-full items-start gap-3 rounded-xl border border-border/50 bg-card/60 px-4 py-3 text-left transition-colors hover:border-primary/20 hover:bg-primary/[0.04]"
-                  >
-                    <LogLevelBadge level={log.logLevel} />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{log.message}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {log.applicationName} · {formatTimestamp(log.timestamp)}
-                      </p>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              {logsQuery.isLoading && !logsQuery.data ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : logs.length === 0 ? (
+                <EmptyState
+                  title="Seçili zaman aralığında log yok"
+                  description="Farklı bir zaman aralığı seçmeyi deneyin veya tüm logları görmek için Loglar sayfasına gidin."
+                  action={
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to="/logs">
+                        Logları aç
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  }
+                />
+              ) : (
+                <div className="space-y-2">
+                  {logs.map((log) => (
+                    <button
+                      key={log.id}
+                      type="button"
+                      onClick={() => setSelectedLog(log)}
+                      className="flex w-full items-start gap-3 rounded-xl border border-border/50 bg-card/60 px-4 py-3 text-left transition-colors hover:border-primary/20 hover:bg-primary/[0.04]"
+                    >
+                      <LogLevelBadge level={log.logLevel} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{log.message}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {log.applicationName} · {formatTimestamp(log.timestamp)}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
-        <div className="space-y-6">
+        <div
+          className={cn(
+            'space-y-6',
+            can('logs:read') && tenantHasNoLogs && 'sm:col-span-2 lg:col-span-3',
+          )}
+        >
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Hesabınız</CardTitle>
