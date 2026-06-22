@@ -30,6 +30,14 @@ public class AuthController : ControllerBase
 
         if (!result.IsSuccess)
         {
+            if (result.ErrorKind == ResultErrorKind.TooManyRequests)
+            {
+                if (result.RetryAfterSeconds.HasValue)
+                    Response.Headers.RetryAfter = result.RetryAfterSeconds.Value.ToString();
+
+                return StatusCode(StatusCodes.Status429TooManyRequests, result);
+            }
+
             if (result.ErrorCode == AuthErrorCodes.AmbiguousTenantContext)
                 return BadRequest(result);
 

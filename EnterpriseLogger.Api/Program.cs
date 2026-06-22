@@ -54,10 +54,12 @@ builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentTenantProvider, HttpContextCurrentTenantProvider>();
 builder.Services.AddScoped<ICurrentUserProvider, HttpContextCurrentUserProvider>();
+builder.Services.AddScoped<ILoginClientContext, HttpContextLoginClientContext>();
 
 builder.Services.AddDualAuthentication(builder.Environment);
 builder.Services.AddFrontendCors(builder.Configuration);
 builder.Services.AddRateLimiting(builder.Environment);
+builder.Services.AddLoginProtection(builder.Environment);
 
 builder.Services.AddScoped<CreateTenantCommand>();
 builder.Services.AddScoped<RotateTenantApiKeyCommand>();

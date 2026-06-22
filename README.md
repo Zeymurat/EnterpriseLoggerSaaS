@@ -269,7 +269,7 @@ Retry with an explicit tenant:
 
 Send the tenant API key for machine integration, or a JWT from login for the admin panel. In Swagger, use **Authorize** for either `X-Api-Key` or `Bearer`.
 
-**Rate limiting:** `POST /api/logs` is limited per tenant via Redis (fixed window). Default: **1000 requests / 60 seconds** (`LOG_INGEST_RATE_LIMIT_PER_MINUTE`, `LOG_INGEST_RATE_LIMIT_WINDOW_SECONDS`). `POST /api/auth/login` and `POST /api/tenants` are limited per client IP (defaults: **20** and **5** requests / 60 seconds). Exceeding any limit returns `429 Too Many Requests` with RFC 7807 Problem Details and a `Retry-After` header. `GET /api/logs` is not rate limited.
+**Rate limiting:** `POST /api/logs` is limited per tenant via Redis (fixed window). Default: **1000 requests / 60 seconds** (`LOG_INGEST_RATE_LIMIT_PER_MINUTE`, `LOG_INGEST_RATE_LIMIT_WINDOW_SECONDS`). `POST /api/auth/login` and `POST /api/tenants` are limited per client IP (defaults: **20** and **5** requests / 60 seconds). **Login lockout:** after repeated failed attempts per email or IP, accounts are locked (default **10** email / **30** IP failures → **15 min** lockout) with exponential backoff from the 3rd failure. Exceeding limits returns `429 Too Many Requests` with RFC 7807 Problem Details and a `Retry-After` header. `GET /api/logs` is not rate limited.
 
 ### User management (JWT only)
 
@@ -389,7 +389,7 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 
 **JWT variables** (see `.env.example`): `JWT_SECRET` (min 32 chars), `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_ACCESS_TOKEN_EXPIRY_MINUTES`, `JWT_MAX_SESSION_HOURS`.
 
-**Redis & rate limiting** (see `.env.example`): `REDIS_CONNECTION_STRING`; log ingestion (`LOG_INGEST_RATE_LIMIT_*`, per tenant on `POST /api/logs`); public endpoints (`AUTH_LOGIN_RATE_LIMIT_*`, `TENANT_REGISTER_RATE_LIMIT_*`, per IP on login and tenant registration). Integration tests use an in-memory limiter (no Redis in CI).
+**Redis & rate limiting** (see `.env.example`): `REDIS_CONNECTION_STRING`; log ingestion (`LOG_INGEST_RATE_LIMIT_*`, per tenant on `POST /api/logs`); public endpoints (`AUTH_LOGIN_RATE_LIMIT_*`, `TENANT_REGISTER_RATE_LIMIT_*`, per IP); login lockout (`LOGIN_MAX_FAILED_ATTEMPTS_EMAIL`, `LOGIN_MAX_FAILED_ATTEMPTS_IP`, `LOGIN_LOCKOUT_MINUTES`, `LOGIN_BACKOFF_START_AFTER`, etc.). Integration tests use in-memory implementations (no Redis in CI).
 
 **CORS** (tenant panel): `CORS_ALLOWED_ORIGINS` — comma-separated origins; default `http://localhost:5173`.
 

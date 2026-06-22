@@ -9,7 +9,8 @@ public enum ResultErrorKind
     Validation = 400,
     Forbidden = 403,
     NotFound = 404,
-    Conflict = 409
+    Conflict = 409,
+    TooManyRequests = 429
 }
 
 public class Result<T>
@@ -19,6 +20,7 @@ public class Result<T>
     public string? ErrorMessage { get; init; }
     public ResultErrorKind ErrorKind { get; init; } = ResultErrorKind.Validation;
     public string? ErrorCode { get; init; }
+    public int? RetryAfterSeconds { get; init; }
     public IReadOnlyList<TenantLoginOptionDto>? TenantOptions { get; init; }
 
     public static Result<T> Success(T data) => new() { Data = data, IsSuccess = true };
@@ -41,4 +43,13 @@ public class Result<T>
     public static Result<T> NotFound(string error) => Failure(error, ResultErrorKind.NotFound);
 
     public static Result<T> Conflict(string error) => Failure(error, ResultErrorKind.Conflict);
+
+    public static Result<T> RateLimited(string error, int retryAfterSeconds) =>
+        new()
+        {
+            IsSuccess = false,
+            ErrorMessage = error,
+            ErrorKind = ResultErrorKind.TooManyRequests,
+            RetryAfterSeconds = Math.Max(1, retryAfterSeconds)
+        };
 }
