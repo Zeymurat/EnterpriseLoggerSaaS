@@ -389,7 +389,7 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 
 **JWT variables** (see `.env.example`): `JWT_SECRET` (min 32 chars), `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_ACCESS_TOKEN_EXPIRY_MINUTES`, `JWT_MAX_SESSION_HOURS`.
 
-**Redis & rate limiting** (see `.env.example`): `REDIS_CONNECTION_STRING`; log ingestion (`LOG_INGEST_RATE_LIMIT_*`, per tenant on `POST /api/logs`); public endpoints (`AUTH_LOGIN_RATE_LIMIT_*`, `TENANT_REGISTER_RATE_LIMIT_*`, per IP); login lockout (`LOGIN_MAX_FAILED_ATTEMPTS_EMAIL`, `LOGIN_MAX_FAILED_ATTEMPTS_IP`, `LOGIN_LOCKOUT_MINUTES`, `LOGIN_BACKOFF_START_AFTER`, etc.). Integration tests use in-memory implementations (no Redis in CI).
+**Redis & rate limiting** (see `.env.example`): `REDIS_CONNECTION_STRING`; log ingestion (`LOG_INGEST_RATE_LIMIT_*`, per tenant on `POST /api/logs`); public endpoints (`AUTH_LOGIN_RATE_LIMIT_*`, `TENANT_REGISTER_RATE_LIMIT_*`, per IP); login lockout (`LOGIN_MAX_FAILED_ATTEMPTS_EMAIL`, `LOGIN_MAX_FAILED_ATTEMPTS_IP`, `LOGIN_LOCKOUT_MINUTES`, `LOGIN_BACKOFF_START_AFTER`, etc.). Set `TRUST_FORWARDED_HEADERS=true` only behind a trusted reverse proxy — otherwise clients can spoof `X-Forwarded-For` to bypass IP limits. Integration tests use in-memory implementations (no Redis in CI).
 
 **CORS** (tenant panel): `CORS_ALLOWED_ORIGINS` — comma-separated origins; default `http://localhost:5173`.
 

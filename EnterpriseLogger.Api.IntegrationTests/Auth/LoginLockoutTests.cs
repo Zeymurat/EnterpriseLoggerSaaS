@@ -21,11 +21,8 @@ public class LoginLockoutTests
         const string email = "lockout@test.local";
         await IntegrationTestAuth.RegisterTenantAsync(client, "Lockout Corp", email);
 
-        for (var i = 0; i < 3; i++)
-        {
-            var failed = await PostLoginAsync(client, email, "WrongPassword123");
-            Assert.Equal(HttpStatusCode.Unauthorized, failed.StatusCode);
-        }
+        Assert.Equal(HttpStatusCode.Unauthorized, (await PostLoginAsync(client, email, "WrongPassword123")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await PostLoginAsync(client, email, "WrongPassword123")).StatusCode);
 
         var locked = await PostLoginAsync(client, email, "WrongPassword123");
         Assert.Equal(HttpStatusCode.TooManyRequests, locked.StatusCode);
@@ -65,7 +62,7 @@ public class LoginLockoutTests
             Assert.Equal(HttpStatusCode.Unauthorized, (await PostLoginAsync(client, email, "WrongPassword123")).StatusCode);
         }
 
-        Assert.Equal(HttpStatusCode.Unauthorized, (await PostLoginAsync(client, email, "WrongPassword123")).StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, (await PostLoginAsync(client, email, "WrongPassword123")).StatusCode);
     }
 
     [Fact]
@@ -83,7 +80,9 @@ public class LoginLockoutTests
         await IntegrationTestAuth.RegisterTenantAsync(client, "Locked Correct Corp", email, password);
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await PostLoginAsync(client, email, "WrongPassword123")).StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, (await PostLoginAsync(client, email, "WrongPassword123")).StatusCode);
+
+        var lockedWithWrongPassword = await PostLoginAsync(client, email, "WrongPassword123");
+        Assert.Equal(HttpStatusCode.TooManyRequests, lockedWithWrongPassword.StatusCode);
 
         var lockedWithCorrectPassword = await PostLoginAsync(client, email, password);
         Assert.Equal(HttpStatusCode.TooManyRequests, lockedWithCorrectPassword.StatusCode);
