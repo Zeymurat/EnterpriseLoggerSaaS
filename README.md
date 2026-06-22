@@ -62,7 +62,7 @@ Dependencies point **inward**. Domain has no infrastructure references.
 | Database | PostgreSQL 16 (Docker) |
 | ORM | Entity Framework Core 8 (code-first) |
 | Validation | FluentValidation 12 |
-| Cache (infra ready) | Redis 7 in `docker-compose` (app integration planned) |
+| Cache | Redis 7 — tenant-scoped `POST /api/logs` rate limiting |
 | Tests | xUnit, Moq, `WebApplicationFactory` integration tests |
 | Local secrets | DotNetEnv + `.env` |
 
@@ -81,10 +81,11 @@ EnterpriseLoggerSaaS/
 │   ├── Common/Models/        # Result<T>
 │   └── Features/             # Tenants, Logs (commands & queries)
 ├── EnterpriseLogger.Infrastructure/
-│   └── Persistence/          # DbContext, migrations, query filters
+│   ├── Persistence/          # DbContext, migrations, query filters
+│   └── RateLimiting/         # Redis + in-memory rate limiter
 ├── EnterpriseLogger.Api/
 │   ├── Controllers/          # TenantsController, LogsController
-│   ├── Middleware/           # TenantMappingMiddleware (API key)
+│   ├── Middleware/           # LogIngestRateLimitMiddleware
 │   └── Infrastructure/       # GlobalExceptionHandler, ApiProblemDetails
 ├── EnterpriseLogger.Application.Tests/
 ├── EnterpriseLogger.Api.IntegrationTests/
@@ -126,6 +127,8 @@ POSTGRES_PASSWORD=<your-password>
 POSTGRES_DB=EnterpriseLoggerDb
 DB_CONNECTION_STRING=Host=localhost;Port=5432;Database=EnterpriseLoggerDb;Username=saas_admin;Password=<your-password>
 REDIS_CONNECTION_STRING=localhost:6379
+LOG_INGEST_RATE_LIMIT_PER_MINUTE=1000
+LOG_INGEST_RATE_LIMIT_WINDOW_SECONDS=60
 ```
 
 > `.env` is gitignored. Never commit passwords.
@@ -184,7 +187,7 @@ dotnet test
 | `PATCH` | `/api/users/{id}/permissions` | Bearer JWT | Update User role permissions (`users:manage`) |
 | `PATCH` | `/api/users/{id}/role` | Bearer JWT (Root) | Promote User → Admin |
 | `PATCH` | `/api/users/{id}/deactivate` | Bearer JWT | Deactivate user (`users:manage`) |
-| `POST` | `/api/logs` | `X-Api-Key` **or** `Bearer JWT` | Ingest a log entry (`Info`, `Warning`, `Error`) |
+| `POST` | `/api/logs` | `X-Api-Key` **or** `Bearer JWT` | Ingest a log entry (`Info`, `Warning`, `Error`). Tenant rate limit applies — `429` when exceeded |
 | `GET` | `/api/logs` | `X-Api-Key` **or** `Bearer JWT` | List logs for the authenticated tenant (paginated; query: `page`, `pageSize`, `logLevel`, `search`, `from`, `to`, `applicationName`) |
 
 ### Register tenant
@@ -265,6 +268,8 @@ Retry with an explicit tenant:
 | **Human (panel)** | `Authorization: Bearer <JWT>` | Root / Admin / User | `logs:read` (GET), `logs:write` (POST) |
 
 Send the tenant API key for machine integration, or a JWT from login for the admin panel. In Swagger, use **Authorize** for either `X-Api-Key` or `Bearer`.
+
+**Rate limiting:** `POST /api/logs` is limited per tenant via Redis (fixed window). Default: **1000 requests / 60 seconds** (`LOG_INGEST_RATE_LIMIT_PER_MINUTE`, `LOG_INGEST_RATE_LIMIT_WINDOW_SECONDS`). Exceeding the limit returns `429 Too Many Requests` with RFC 7807 Problem Details and a `Retry-After` header (seconds until the window resets). `GET /api/logs` is not rate limited.
 
 ### User management (JWT only)
 
@@ -367,6 +372,7 @@ In the tenant panel:
 | FluentValidation / business rule failure | `400 Bad Request` — `Result<T>` with `isSuccess: false` |
 | Missing or invalid API key | `401 Unauthorized` — RFC 7807 Problem Details |
 | Inactive tenant | `403 Forbidden` — RFC 7807 Problem Details |
+| Log ingestion rate limit exceeded | `429 Too Many Requests` — RFC 7807 Problem Details + `Retry-After` header |
 | Unhandled server error | `500 Internal Server Error` — RFC 7807 Problem Details |
 
 In **Production**, Problem Details responses do **not** include stack traces or `exceptionDetail` (CWE-209 safe). Full exception detail is only attached when `IsDevelopment()` is true.
@@ -382,6 +388,8 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 | `appsettings.json` | Non-secret defaults only (connection string empty) |
 
 **JWT variables** (see `.env.example`): `JWT_SECRET` (min 32 chars), `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_ACCESS_TOKEN_EXPIRY_MINUTES`, `JWT_MAX_SESSION_HOURS`.
+
+**Redis & rate limiting** (see `.env.example`): `REDIS_CONNECTION_STRING`, `LOG_INGEST_RATE_LIMIT_PER_MINUTE` (default `1000`), `LOG_INGEST_RATE_LIMIT_WINDOW_SECONDS` (default `60`). Limits apply per tenant on `POST /api/logs` only. Integration tests use an in-memory limiter (no Redis in CI).
 
 **CORS** (tenant panel): `CORS_ALLOWED_ORIGINS` — comma-separated origins; default `http://localhost:5173`.
 
@@ -429,7 +437,7 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 - [x] Paginated log listing with filters, live time presets, CSV export (tenant panel)
 - [x] Empty state & error UX (onboarding card, API error card, network fallback)
 - [x] Idle session warning + JWT refresh (`POST /api/auth/refresh`)
-- [ ] Redis for rate limits / quotas
+- [x] Redis for rate limits / quotas
 - [x] GitHub Actions CI (`build` + `test`)
 
 ---

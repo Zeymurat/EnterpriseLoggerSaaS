@@ -1,5 +1,6 @@
 using EnterpriseLogger.Api.Configuration;
 using EnterpriseLogger.Api.Infrastructure;
+using EnterpriseLogger.Api.Middleware;
 using EnterpriseLogger.Api.Services;
 using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
@@ -56,6 +57,7 @@ builder.Services.AddScoped<ICurrentUserProvider, HttpContextCurrentUserProvider>
 
 builder.Services.AddDualAuthentication(builder.Environment);
 builder.Services.AddFrontendCors(builder.Configuration);
+builder.Services.AddLogIngestRateLimiting(builder.Environment);
 
 builder.Services.AddScoped<CreateTenantCommand>();
 builder.Services.AddScoped<RotateTenantApiKeyCommand>();
@@ -147,6 +149,7 @@ app.UseCors(FrontendCorsExtensions.PolicyName);
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<LogIngestRateLimitMiddleware>();
 app.MapControllers();
 
 if (isDevelopment || isTesting)
