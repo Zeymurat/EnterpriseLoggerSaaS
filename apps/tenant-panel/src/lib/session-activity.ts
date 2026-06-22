@@ -1,6 +1,11 @@
 type ActivityListener = () => void
 
 const listeners = new Set<ActivityListener>()
+let suppressActivity = false
+
+export function setSessionActivitySuppressed(suppressed: boolean): void {
+  suppressActivity = suppressed
+}
 
 export function registerSessionActivityListener(listener: ActivityListener): () => void {
   listeners.add(listener)
@@ -8,13 +13,17 @@ export function registerSessionActivityListener(listener: ActivityListener): () 
 }
 
 export function recordSessionActivity(): void {
+  if (suppressActivity) return
   listeners.forEach((listener) => listener())
 }
 
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'scroll', 'touchstart'] as const
 
 export function bindGlobalSessionActivityListeners(onActivity: () => void): () => void {
-  const handler = () => onActivity()
+  const handler = () => {
+    if (suppressActivity) return
+    onActivity()
+  }
 
   ACTIVITY_EVENTS.forEach((eventName) => {
     window.addEventListener(eventName, handler, { passive: true })

@@ -27,10 +27,21 @@ export function SessionExtendDialog({
       className="max-w-md"
       footer={
         <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-          <Button type="button" variant="outline" onClick={onLogout} disabled={isExtending}>
+          <Button
+            type="button"
+            variant="outline"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={onLogout}
+            disabled={isExtending}
+          >
             Çıkış yap
           </Button>
-          <Button type="button" onClick={onExtend} disabled={isExtending}>
+          <Button
+            type="button"
+            onMouseDown={(event) => event.stopPropagation()}
+            onClick={onExtend}
+            disabled={isExtending}
+          >
             {isExtending ? 'Uzatılıyor...' : 'Oturumu uzat'}
           </Button>
         </div>

@@ -7,6 +7,7 @@ import { SESSION_IDLE_MS, SESSION_WARN_MS } from '@/lib/session-config'
 import {
   bindGlobalSessionActivityListeners,
   registerSessionActivityListener,
+  setSessionActivitySuppressed,
 } from '@/lib/session-activity'
 
 export function IdleSessionGuard() {
@@ -27,6 +28,8 @@ export function IdleSessionGuard() {
   }, [])
 
   const forceIdleLogout = useCallback(() => {
+    idleLogoutTriggeredRef.current = true
+    setShowWarning(false)
     logout()
     queryClient.clear()
     navigate('/login?session=expired&reason=idle', { replace: true })
@@ -59,6 +62,11 @@ export function IdleSessionGuard() {
       unbindGlobal()
     }
   }, [isAuthenticated, bumpActivity])
+
+  useEffect(() => {
+    setSessionActivitySuppressed(showWarning)
+    return () => setSessionActivitySuppressed(false)
+  }, [showWarning])
 
   useEffect(() => {
     if (!isAuthenticated) return
