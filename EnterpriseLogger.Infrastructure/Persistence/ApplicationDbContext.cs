@@ -102,6 +102,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 _tenantProvider.TenantId != null && log.TenantId == _tenantProvider.TenantId);
 
             entity.HasIndex(log => new { log.TenantId, log.LogLevel, log.Timestamp });
+            entity.HasIndex(log => new { log.TenantId, log.CorrelationId });
 
             entity.Property(l => l.HttpMethod).HasMaxLength(10);
             entity.Property(l => l.RequestPath).HasMaxLength(500);
