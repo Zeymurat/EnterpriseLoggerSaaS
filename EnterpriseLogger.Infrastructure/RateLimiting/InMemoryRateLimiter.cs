@@ -5,25 +5,20 @@ namespace EnterpriseLogger.Infrastructure.RateLimiting;
 
 public class InMemoryRateLimiter : IRateLimiter
 {
-    private readonly RateLimitSettings _settings;
     private readonly object _sync = new();
     private readonly Dictionary<string, int> _counts = new();
 
-    public InMemoryRateLimiter(RateLimitSettings settings)
-    {
-        _settings = settings;
-    }
-
     public Task<RateLimitAcquireResult> TryAcquireAsync(
-        int tenantId,
+        string scopeKey,
         string bucket,
+        RateLimitPolicy policy,
         CancellationToken cancellationToken = default)
     {
-        if (_settings.LogIngestRequestsPerWindow <= 0)
+        if (policy.RequestsPerWindow <= 0)
             return Task.FromResult(RateLimitAcquireResult.Allowed());
 
-        var windowIndex = GetCurrentWindowIndex();
-        var key = $"{bucket}:{tenantId}:{windowIndex}";
+        var windowIndex = GetCurrentWindowIndex(policy.WindowSeconds);
+        var key = $"{bucket}:{scopeKey}:{windowIndex}";
 
         lock (_sync)
         {
@@ -32,19 +27,18 @@ public class InMemoryRateLimiter : IRateLimiter
             _counts[key] = count;
             PruneStaleWindows(windowIndex);
 
-            if (count > _settings.LogIngestRequestsPerWindow)
-                return Task.FromResult(RateLimitAcquireResult.Denied(GetRetryAfterSeconds()));
+            if (count > policy.RequestsPerWindow)
+                return Task.FromResult(RateLimitAcquireResult.Denied(GetRetryAfterSeconds(policy.WindowSeconds)));
 
             return Task.FromResult(RateLimitAcquireResult.Allowed());
         }
     }
 
-    private long GetCurrentWindowIndex() =>
-        DateTimeOffset.UtcNow.ToUnixTimeSeconds() / _settings.LogIngestWindowSeconds;
+    private static long GetCurrentWindowIndex(int windowSeconds) =>
+        DateTimeOffset.UtcNow.ToUnixTimeSeconds() / windowSeconds;
 
-    private int GetRetryAfterSeconds()
+    private static int GetRetryAfterSeconds(int windowSeconds)
     {
-        var windowSeconds = _settings.LogIngestWindowSeconds;
         var elapsedInWindow = (int)(DateTimeOffset.UtcNow.ToUnixTimeSeconds() % windowSeconds);
         return windowSeconds - elapsedInWindow;
     }

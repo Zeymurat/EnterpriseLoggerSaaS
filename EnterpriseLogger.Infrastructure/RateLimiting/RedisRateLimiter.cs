@@ -1,5 +1,4 @@
 using EnterpriseLogger.Application.Common.Interfaces;
-using EnterpriseLogger.Application.Common.Settings;
 using StackExchange.Redis;
 
 namespace EnterpriseLogger.Infrastructure.RateLimiting;
@@ -7,24 +6,23 @@ namespace EnterpriseLogger.Infrastructure.RateLimiting;
 public class RedisRateLimiter : IRateLimiter
 {
     private readonly IConnectionMultiplexer _redis;
-    private readonly RateLimitSettings _settings;
 
-    public RedisRateLimiter(IConnectionMultiplexer redis, RateLimitSettings settings)
+    public RedisRateLimiter(IConnectionMultiplexer redis)
     {
         _redis = redis;
-        _settings = settings;
     }
 
     public async Task<RateLimitAcquireResult> TryAcquireAsync(
-        int tenantId,
+        string scopeKey,
         string bucket,
+        RateLimitPolicy policy,
         CancellationToken cancellationToken = default)
     {
-        if (_settings.LogIngestRequestsPerWindow <= 0)
+        if (policy.RequestsPerWindow <= 0)
             return RateLimitAcquireResult.Allowed();
 
-        var windowIndex = GetCurrentWindowIndex();
-        var key = $"ratelimit:{bucket}:{tenantId}:{windowIndex}";
+        var windowIndex = GetCurrentWindowIndex(policy.WindowSeconds);
+        var key = $"ratelimit:{bucket}:{scopeKey}:{windowIndex}";
         var db = _redis.GetDatabase();
 
         var count = await db.StringIncrementAsync(key);
@@ -32,23 +30,21 @@ public class RedisRateLimiter : IRateLimiter
         {
             await db.KeyExpireAsync(
                 key,
-                TimeSpan.FromSeconds(_settings.LogIngestWindowSeconds * 2));
+                TimeSpan.FromSeconds(policy.WindowSeconds * 2));
         }
 
-        if (count > _settings.LogIngestRequestsPerWindow)
-            return RateLimitAcquireResult.Denied(GetRetryAfterSeconds());
+        if (count > policy.RequestsPerWindow)
+            return RateLimitAcquireResult.Denied(GetRetryAfterSeconds(policy.WindowSeconds));
 
         return RateLimitAcquireResult.Allowed();
     }
 
-    private long GetCurrentWindowIndex() =>
-        DateTimeOffset.UtcNow.ToUnixTimeSeconds() / _settings.LogIngestWindowSeconds;
+    private static long GetCurrentWindowIndex(int windowSeconds) =>
+        DateTimeOffset.UtcNow.ToUnixTimeSeconds() / windowSeconds;
 
     private static int GetRetryAfterSeconds(int windowSeconds)
     {
         var elapsedInWindow = (int)(DateTimeOffset.UtcNow.ToUnixTimeSeconds() % windowSeconds);
         return windowSeconds - elapsedInWindow;
     }
-
-    private int GetRetryAfterSeconds() => GetRetryAfterSeconds(_settings.LogIngestWindowSeconds);
 }

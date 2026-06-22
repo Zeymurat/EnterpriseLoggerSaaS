@@ -57,7 +57,7 @@ builder.Services.AddScoped<ICurrentUserProvider, HttpContextCurrentUserProvider>
 
 builder.Services.AddDualAuthentication(builder.Environment);
 builder.Services.AddFrontendCors(builder.Configuration);
-builder.Services.AddLogIngestRateLimiting(builder.Environment);
+builder.Services.AddRateLimiting(builder.Environment);
 
 builder.Services.AddScoped<CreateTenantCommand>();
 builder.Services.AddScoped<RotateTenantApiKeyCommand>();
@@ -147,6 +147,7 @@ if (isDevelopment)
 
 app.UseCors(FrontendCorsExtensions.PolicyName);
 app.UseHttpsRedirection();
+app.UseMiddleware<PublicEndpointRateLimitMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<LogIngestRateLimitMiddleware>();

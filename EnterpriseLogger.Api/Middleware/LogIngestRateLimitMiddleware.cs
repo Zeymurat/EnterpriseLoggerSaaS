@@ -1,5 +1,6 @@
 using EnterpriseLogger.Api.Infrastructure;
 using EnterpriseLogger.Application.Common.Interfaces;
+using EnterpriseLogger.Application.Common.Settings;
 
 namespace EnterpriseLogger.Api.Middleware;
 
@@ -17,7 +18,8 @@ public class LogIngestRateLimitMiddleware
     public async Task InvokeAsync(
         HttpContext context,
         ICurrentTenantProvider tenantProvider,
-        IRateLimiter rateLimiter)
+        IRateLimiter rateLimiter,
+        RateLimitSettings settings)
     {
         if (!ShouldRateLimit(context))
         {
@@ -32,8 +34,9 @@ public class LogIngestRateLimitMiddleware
         }
 
         var result = await rateLimiter.TryAcquireAsync(
-            tenantProvider.TenantId!.Value,
+            $"tenant:{tenantProvider.TenantId!.Value}",
             LogIngestBucket,
+            settings.LogIngestPolicy,
             context.RequestAborted);
 
         if (!result.IsAllowed)

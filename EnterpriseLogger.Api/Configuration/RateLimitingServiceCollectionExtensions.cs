@@ -7,7 +7,7 @@ namespace EnterpriseLogger.Api.Configuration;
 
 public static class RateLimitingServiceCollectionExtensions
 {
-    public static IServiceCollection AddLogIngestRateLimiting(
+    public static IServiceCollection AddRateLimiting(
         this IServiceCollection services,
         IHostEnvironment environment)
     {
@@ -45,6 +45,18 @@ public static class RateLimitingServiceCollectionExtensions
                     10_000),
                 LogIngestWindowSeconds = ParsePositiveInt(
                     Environment.GetEnvironmentVariable("LOG_INGEST_RATE_LIMIT_WINDOW_SECONDS"),
+                    60),
+                AuthLoginRequestsPerWindow = ParsePositiveInt(
+                    Environment.GetEnvironmentVariable("AUTH_LOGIN_RATE_LIMIT_PER_MINUTE"),
+                    10_000),
+                AuthLoginWindowSeconds = ParsePositiveInt(
+                    Environment.GetEnvironmentVariable("AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS"),
+                    60),
+                TenantRegisterRequestsPerWindow = ParsePositiveInt(
+                    Environment.GetEnvironmentVariable("TENANT_REGISTER_RATE_LIMIT_PER_MINUTE"),
+                    10_000),
+                TenantRegisterWindowSeconds = ParsePositiveInt(
+                    Environment.GetEnvironmentVariable("TENANT_REGISTER_RATE_LIMIT_WINDOW_SECONDS"),
                     60)
             };
         }
@@ -56,6 +68,18 @@ public static class RateLimitingServiceCollectionExtensions
                 1000),
             LogIngestWindowSeconds = ParsePositiveInt(
                 Environment.GetEnvironmentVariable("LOG_INGEST_RATE_LIMIT_WINDOW_SECONDS"),
+                60),
+            AuthLoginRequestsPerWindow = ParsePositiveInt(
+                Environment.GetEnvironmentVariable("AUTH_LOGIN_RATE_LIMIT_PER_MINUTE"),
+                20),
+            AuthLoginWindowSeconds = ParsePositiveInt(
+                Environment.GetEnvironmentVariable("AUTH_LOGIN_RATE_LIMIT_WINDOW_SECONDS"),
+                60),
+            TenantRegisterRequestsPerWindow = ParsePositiveInt(
+                Environment.GetEnvironmentVariable("TENANT_REGISTER_RATE_LIMIT_PER_MINUTE"),
+                5),
+            TenantRegisterWindowSeconds = ParsePositiveInt(
+                Environment.GetEnvironmentVariable("TENANT_REGISTER_RATE_LIMIT_WINDOW_SECONDS"),
                 60)
         };
     }
