@@ -1,6 +1,8 @@
 using EnterpriseLogger.Application.Common;
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
+using EnterpriseLogger.Application.Common.Subscriptions;
 using EnterpriseLogger.Application.Features.Tenants.Dtos;
 using EnterpriseLogger.Domain.Entities;
 using EnterpriseLogger.Domain.Enums;
@@ -41,6 +43,18 @@ public class CreateTenantCommand
         if (!PhoneNormalizer.TryNormalize(request.OwnerPhone, out var ownerPhone))
             return Result<TenantResponseDto>.Failure("Validasyon hatası: Geçerli bir telefon numarası giriniz.");
 
+        var freePackage = await _context.Packages
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                p => p.Code == PackageCodes.Free && p.IsDefault,
+                cancellationToken);
+
+        if (freePackage is null)
+        {
+            return Result<TenantResponseDto>.Failure(
+                "Varsayılan Free paket bulunamadı. Lütfen veritabanı seed/migration durumunu kontrol edin.");
+        }
+
         var tenant = new Tenant
         {
             Name = request.Name.Trim(),
@@ -60,8 +74,20 @@ public class CreateTenantCommand
             CreatedAt = DateTime.UtcNow
         };
 
+        var now = DateTime.UtcNow;
+        var subscription = SubscriptionHelper.CreateSubscription(
+            tenant.Id,
+            freePackage,
+            BillingCycle.Monthly,
+            isPaid: true,
+            autoRenew: false,
+            gracePeriodEndDate: null,
+            now);
+        subscription.Tenant = tenant;
+
         _context.Tenants.Add(tenant);
         _context.Users.Add(rootUser);
+        _context.TenantSubscriptions.Add(subscription);
 
         try
         {

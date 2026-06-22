@@ -37,14 +37,36 @@ public class GetPlatformTenantsQuery
             .Select(group => new { TenantId = group.Key, Count = group.LongCount() })
             .ToDictionaryAsync(x => x.TenantId, x => x.Count, cancellationToken);
 
+        var now = DateTime.UtcNow;
+        var activeSubscriptions = await _context.TenantSubscriptions
+            .AsNoTracking()
+            .Include(s => s.Package)
+            .Where(s => (s.Status == Domain.Enums.SubscriptionStatus.Active
+                    || s.Status == Domain.Enums.SubscriptionStatus.PendingPayment
+                    || s.Status == Domain.Enums.SubscriptionStatus.PastDue)
+                && s.EndDate > now)
+            .OrderByDescending(s => s.StartDate)
+            .ToListAsync(cancellationToken);
+
+        var subscriptionByTenant = activeSubscriptions
+            .GroupBy(s => s.TenantId)
+            .ToDictionary(g => g.Key, g => g.First());
+
         var items = tenants
-            .Select(t => new PlatformTenantListItemDto(
-                t.Id,
-                t.Name,
-                t.IsActive,
-                t.CreatedAt,
-                t.UserCount,
-                logCounts.GetValueOrDefault(t.Id)))
+            .Select(t =>
+            {
+                subscriptionByTenant.TryGetValue(t.Id, out var subscription);
+
+                return new PlatformTenantListItemDto(
+                    t.Id,
+                    t.Name,
+                    t.IsActive,
+                    t.CreatedAt,
+                    t.UserCount,
+                    logCounts.GetValueOrDefault(t.Id),
+                    subscription?.Package.Name,
+                    subscription?.Status);
+            })
             .ToList();
 
         return Result<PlatformTenantListResponse>.Success(new PlatformTenantListResponse(items));

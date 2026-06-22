@@ -7,6 +7,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { isUnauthorizedError } from '@/lib/api'
 import { LoginPage } from '@/pages/LoginPage'
 import { TenantsPage } from '@/pages/TenantsPage'
+import { TenantDetailPage } from '@/pages/TenantDetailPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,6 +31,7 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<TenantsPage />} />
+                <Route path="/tenants/:id" element={<TenantDetailPage />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

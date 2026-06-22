@@ -195,6 +195,10 @@ dotnet test
 | `POST` | `/api/auth/login` | — | Panel login (email + password → JWT) |
 | `POST` | `/api/platform/auth/login` | — | Platform admin login (separate JWT, no `tenantId`) |
 | `GET` | `/api/platform/tenants` | Bearer JWT (`platform_admin=true`) | List all tenants with user/log counts |
+| `GET` | `/api/platform/tenants/{id}` | Bearer JWT (`platform_admin=true`) | Tenant detail + subscription history |
+| `POST` | `/api/platform/tenants/{id}/subscription` | Bearer JWT (`platform_admin=true`) | Assign or change tenant package (closes previous subscription) |
+| `GET` | `/api/platform/packages` | Bearer JWT (`platform_admin=true`) | List subscription packages |
+| `PUT` | `/api/platform/packages/{id}` | Bearer JWT (`platform_admin=true`) | Update package quotas and pricing |
 | `POST` | `/api/auth/refresh` | Bearer JWT | Extend panel session (new access token, same `session_started_at` claim) |
 | `GET` | `/api/users` | Bearer JWT | List tenant users (`users:read`) |
 | `POST` | `/api/users/invite` | Bearer JWT | Invite Admin or User (`users:invite`) |

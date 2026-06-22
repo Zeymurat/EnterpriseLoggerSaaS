@@ -63,6 +63,16 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.HasData(PermissionSeed.GetPermissions());
         });
 
+        modelBuilder.Entity<Package>(entity =>
+        {
+            entity.HasIndex(p => p.Code).IsUnique();
+            entity.Property(p => p.Code).HasMaxLength(32);
+            entity.Property(p => p.Name).HasMaxLength(100);
+            entity.Property(p => p.Description).HasMaxLength(500);
+            entity.Property(p => p.AllowedLogLevels).HasMaxLength(128);
+            entity.HasData(PackageSeed.GetDefaultPackages());
+        });
+
         modelBuilder.Entity<UserPermission>(entity =>
         {
             entity.HasKey(up => new { up.UserId, up.PermissionId });
@@ -92,8 +102,10 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                   .HasForeignKey(s => s.TenantId);
 
             entity.HasOne(s => s.Package)
-                  .WithMany()
+                  .WithMany(p => p.Subscriptions)
                   .HasForeignKey(s => s.PackageId);
+
+            entity.HasIndex(s => new { s.TenantId, s.StartDate });
         });
 
         modelBuilder.Entity<SystemLog>(entity =>

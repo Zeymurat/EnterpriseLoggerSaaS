@@ -1,6 +1,8 @@
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { getPlatformTenants } from '@/lib/api'
+import { getPlatformTenants, subscriptionStatusLabel } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 function formatDate(value: string): string {
@@ -39,7 +41,7 @@ export function TenantsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Tenantlar</h1>
         <p className="text-sm text-muted-foreground">
-          Platformdaki tüm şirketler, kullanıcı ve log özetleri.
+          Platformdaki tüm şirketler, paket ve kullanım özetleri.
         </p>
       </div>
 
@@ -52,15 +54,32 @@ export function TenantsPage() {
           {tenants.map((tenant) => (
             <Card key={tenant.id}>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-base font-semibold">{tenant.name}</CardTitle>
+                <div className="space-y-1">
+                  <CardTitle className="text-base font-semibold">{tenant.name}</CardTitle>
+                  {tenant.currentPackageName ? (
+                    <p className="text-sm text-muted-foreground">
+                      Paket: {tenant.currentPackageName}
+                      {tenant.currentSubscriptionStatus !== null
+                        ? ` · ${subscriptionStatusLabel(tenant.currentSubscriptionStatus)}`
+                        : null}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Paket atanmamış</p>
+                  )}
+                </div>
                 <Badge variant={tenant.isActive ? 'default' : 'secondary'}>
                   {tenant.isActive ? 'Aktif' : 'Pasif'}
                 </Badge>
               </CardHeader>
-              <CardContent className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
-                <p>Kayıt: {formatDate(tenant.createdAt)}</p>
-                <p>Kullanıcı: {formatNumber(tenant.userCount)}</p>
-                <p>Log: {formatNumber(tenant.logCount)}</p>
+              <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="grid gap-1 text-sm text-muted-foreground sm:grid-cols-3 sm:gap-4">
+                  <p>Kayıt: {formatDate(tenant.createdAt)}</p>
+                  <p>Kullanıcı: {formatNumber(tenant.userCount)}</p>
+                  <p>Log: {formatNumber(tenant.logCount)}</p>
+                </div>
+                <Button asChild variant="outline" size="sm">
+                  <Link to={`/tenants/${tenant.id}`}>Detay & abonelik</Link>
+                </Button>
               </CardContent>
             </Card>
           ))}
