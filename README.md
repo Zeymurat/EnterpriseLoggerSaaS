@@ -197,6 +197,7 @@ dotnet test
 | `GET` | `/api/platform/tenants` | Bearer JWT (`platform_admin=true`) | List all tenants with user/log counts |
 | `GET` | `/api/platform/tenants/{id}` | Bearer JWT (`platform_admin=true`) | Tenant detail + subscription history |
 | `POST` | `/api/platform/tenants/{id}/subscription` | Bearer JWT (`platform_admin=true`) | Assign or change tenant package (closes previous subscription) |
+| `POST` | `/api/platform/tenants/{id}/impersonate` | Bearer JWT (`platform_admin=true`) | Issue Root user JWT for tenant panel login-as |
 | `GET` | `/api/platform/packages` | Bearer JWT (`platform_admin=true`) | List subscription packages |
 | `PUT` | `/api/platform/packages/{id}` | Bearer JWT (`platform_admin=true`) | Update package quotas and pricing |
 | `POST` | `/api/auth/refresh` | Bearer JWT | Extend panel session (new access token, same `session_started_at` claim) |

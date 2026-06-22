@@ -7,6 +7,7 @@ import { IdleSessionGuard } from '@/components/auth/IdleSessionGuard'
 import { SessionExpiredBridge } from '@/components/auth/SessionExpiredBridge'
 import { Toaster } from '@/components/ui/sonner'
 import { isUnauthorizedError } from '@/lib/api'
+import { ImpersonatePage } from '@/pages/ImpersonatePage'
 import { AuthPage } from '@/pages/AuthPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { LogsPage } from '@/pages/LogsPage'
@@ -34,6 +35,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<AuthPage />} />
             <Route path="/register" element={<AuthPage />} />
+            <Route path="/impersonate" element={<ImpersonatePage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<DashboardPage />} />

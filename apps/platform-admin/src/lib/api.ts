@@ -117,7 +117,23 @@ export interface AssignTenantSubscriptionRequest {
   gracePeriodEndDate?: string | null
 }
 
+export interface TenantPanelSession {
+  accessToken: string
+  expiresIn: number
+  user: {
+    id: number
+    email: string
+    phone: string
+    role: string
+    tenantId: number
+    tenantName: string
+    permissions: string[]
+  }
+}
+
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5247'
+
+const TENANT_PANEL_URL = import.meta.env.VITE_TENANT_PANEL_URL ?? 'http://localhost:5173'
 
 export const NETWORK_ERROR_MESSAGE =
   'Sunucuya ulaşılamadı. Lütfen az sonra tekrar deneyin.'
@@ -245,4 +261,18 @@ export async function assignTenantSubscription(
 
   const data = await parseResult<{ subscription: PlatformSubscription }>(response)
   return data.subscription
+}
+
+export async function impersonateTenant(tenantId: number): Promise<TenantPanelSession> {
+  const response = await apiFetch(`${API_URL}/api/platform/tenants/${tenantId}/impersonate`, {
+    method: 'POST',
+    headers: authHeaders(),
+  })
+
+  return parseResult<TenantPanelSession>(response)
+}
+
+export function openTenantPanelWithSession(session: TenantPanelSession): void {
+  const payload = encodeURIComponent(btoa(JSON.stringify(session)))
+  window.open(`${TENANT_PANEL_URL}/impersonate?session=${payload}`, '_blank', 'noopener,noreferrer')
 }

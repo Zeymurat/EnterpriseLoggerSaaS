@@ -1,5 +1,6 @@
 using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Models;
+using EnterpriseLogger.Application.Features.Auth.Dtos;
 using EnterpriseLogger.Application.Features.Platform.Tenants.Commands;
 using EnterpriseLogger.Application.Features.Platform.Tenants.Dtos;
 using EnterpriseLogger.Application.Features.Platform.Tenants.Queries;
@@ -19,15 +20,18 @@ public class PlatformTenantsController : ControllerBase
     private readonly GetPlatformTenantsQuery _getPlatformTenantsQuery;
     private readonly GetPlatformTenantDetailQuery _getPlatformTenantDetailQuery;
     private readonly AssignTenantSubscriptionCommand _assignTenantSubscriptionCommand;
+    private readonly ImpersonateTenantCommand _impersonateTenantCommand;
 
     public PlatformTenantsController(
         GetPlatformTenantsQuery getPlatformTenantsQuery,
         GetPlatformTenantDetailQuery getPlatformTenantDetailQuery,
-        AssignTenantSubscriptionCommand assignTenantSubscriptionCommand)
+        AssignTenantSubscriptionCommand assignTenantSubscriptionCommand,
+        ImpersonateTenantCommand impersonateTenantCommand)
     {
         _getPlatformTenantsQuery = getPlatformTenantsQuery;
         _getPlatformTenantDetailQuery = getPlatformTenantDetailQuery;
         _assignTenantSubscriptionCommand = assignTenantSubscriptionCommand;
+        _impersonateTenantCommand = impersonateTenantCommand;
     }
 
     [HttpGet]
@@ -63,6 +67,27 @@ public class PlatformTenantsController : ControllerBase
         {
             if (result.ErrorKind == ResultErrorKind.NotFound)
                 return NotFound(result);
+
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    [HttpPost("{id:int}/impersonate")]
+    public async Task<ActionResult<Result<LoginResponse>>> Impersonate(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var result = await _impersonateTenantCommand.ExecuteAsync(id, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.ErrorKind == ResultErrorKind.NotFound)
+                return NotFound(result);
+
+            if (result.ErrorKind == ResultErrorKind.Forbidden)
+                return StatusCode(StatusCodes.Status403Forbidden, result);
 
             return BadRequest(result);
         }

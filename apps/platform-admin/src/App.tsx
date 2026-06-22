@@ -6,8 +6,9 @@ import { AppLayout } from '@/components/layout/AppLayout'
 import { Toaster } from '@/components/ui/sonner'
 import { isUnauthorizedError } from '@/lib/api'
 import { LoginPage } from '@/pages/LoginPage'
-import { TenantsPage } from '@/pages/TenantsPage'
-import { TenantDetailPage } from '@/pages/TenantDetailPage'
+import { CustomersPage } from '@/pages/CustomersPage'
+import { PackagesPage } from '@/pages/PackagesPage'
+import { PaymentsPage } from '@/pages/PaymentsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,11 +31,13 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
-                <Route path="/" element={<TenantsPage />} />
-                <Route path="/tenants/:id" element={<TenantDetailPage />} />
+                <Route path="/" element={<Navigate to="/customers" replace />} />
+                <Route path="/customers" element={<CustomersPage />} />
+                <Route path="/packages" element={<PackagesPage />} />
+                <Route path="/payments" element={<PaymentsPage />} />
               </Route>
             </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<Navigate to="/customers" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

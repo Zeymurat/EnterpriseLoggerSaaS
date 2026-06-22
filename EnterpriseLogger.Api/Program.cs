@@ -83,6 +83,7 @@ builder.Services.AddScoped<PlatformLoginCommand>();
 builder.Services.AddScoped<GetPlatformTenantsQuery>();
 builder.Services.AddScoped<GetPlatformTenantDetailQuery>();
 builder.Services.AddScoped<AssignTenantSubscriptionCommand>();
+builder.Services.AddScoped<ImpersonateTenantCommand>();
 builder.Services.AddScoped<GetPlatformPackagesQuery>();
 builder.Services.AddScoped<UpdatePlatformPackageCommand>();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateTenantRequestValidator>();
