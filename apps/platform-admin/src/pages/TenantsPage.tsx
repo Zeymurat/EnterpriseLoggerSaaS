@@ -1,0 +1,71 @@
+import { useQuery } from '@tanstack/react-query'
+import { getPlatformTenants } from '@/lib/api'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat('tr-TR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value))
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat('tr-TR').format(value)
+}
+
+export function TenantsPage() {
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['platform-tenants'],
+    queryFn: getPlatformTenants,
+  })
+
+  if (isLoading) {
+    return <p className="text-sm text-muted-foreground">Tenant listesi yükleniyor…</p>
+  }
+
+  if (isError) {
+    return (
+      <p className="text-sm text-destructive">
+        {error instanceof Error ? error.message : 'Tenant listesi alınamadı.'}
+      </p>
+    )
+  }
+
+  const tenants = data?.tenants ?? []
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">Tenantlar</h1>
+        <p className="text-sm text-muted-foreground">
+          Platformdaki tüm şirketler, kullanıcı ve log özetleri.
+        </p>
+      </div>
+
+      {tenants.length === 0 ? (
+        <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
+          Henüz kayıtlı tenant yok.
+        </p>
+      ) : (
+        <div className="grid gap-4">
+          {tenants.map((tenant) => (
+            <Card key={tenant.id}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-base font-semibold">{tenant.name}</CardTitle>
+                <Badge variant={tenant.isActive ? 'default' : 'secondary'}>
+                  {tenant.isActive ? 'Aktif' : 'Pasif'}
+                </Badge>
+              </CardHeader>
+              <CardContent className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+                <p>Kayıt: {formatDate(tenant.createdAt)}</p>
+                <p>Kullanıcı: {formatNumber(tenant.userCount)}</p>
+                <p>Log: {formatNumber(tenant.logCount)}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

@@ -4,7 +4,7 @@ public static class FrontendCorsExtensions
 {
     public const string PolicyName = "Frontend";
 
-    private static readonly string[] DefaultOrigins = ["http://localhost:5173"];
+    private static readonly string[] DefaultOrigins = ["http://localhost:5173", "http://localhost:5174"];
 
     public static IServiceCollection AddFrontendCors(
         this IServiceCollection services,

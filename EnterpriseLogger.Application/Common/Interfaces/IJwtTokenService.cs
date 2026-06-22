@@ -9,6 +9,8 @@ public interface IJwtTokenService
         string role,
         IReadOnlyList<string> permissions,
         DateTime sessionStartedAtUtc);
+
+    JwtTokenResult GeneratePlatformToken(int platformAdminId, string email);
 }
 
 public record JwtTokenResult(string AccessToken, int ExpiresInSeconds);

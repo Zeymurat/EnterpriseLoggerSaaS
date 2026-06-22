@@ -90,7 +90,8 @@ EnterpriseLoggerSaaS/
 ├── EnterpriseLogger.Application.Tests/
 ├── EnterpriseLogger.Api.IntegrationTests/
 └── apps/
-    └── tenant-panel/         # React SPA (Vite + Tailwind + shadcn-style UI)
+    ├── tenant-panel/         # React SPA — tenant users (Vite, port 5173)
+    └── platform-admin/       # React SPA — platform operators (Vite, port 5174)
 ```
 
 ---
@@ -164,9 +165,20 @@ npm install
 npm run dev
 ```
 
-Panel: **http://localhost:5173** — requires API running and `CORS_ALLOWED_ORIGINS=http://localhost:5173` in root `.env`.
+Panel: **http://localhost:5173** — requires API running and `CORS_ALLOWED_ORIGINS` including `http://localhost:5173` in root `.env`.
 
-### 6. Run tests
+### 6. Run platform admin (optional)
+
+```bash
+cd apps/platform-admin
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Platform admin: **http://localhost:5174** — separate login (`POST /api/platform/auth/login`). On first Development startup, set `PLATFORM_ADMIN_EMAIL` and `PLATFORM_ADMIN_PASSWORD` in root `.env`; the API seeds the first platform admin if the table is empty.
+
+### 7. Run tests
 
 ```bash
 dotnet test
@@ -181,6 +193,8 @@ dotnet test
 | `POST` | `/api/tenants` | — | Register a new tenant |
 | `POST` | `/api/tenants/me/api-key/rotate` | Bearer JWT (Root, `apikeys:rotate`) | Generate or rotate tenant API key (shown once) |
 | `POST` | `/api/auth/login` | — | Panel login (email + password → JWT) |
+| `POST` | `/api/platform/auth/login` | — | Platform admin login (separate JWT, no `tenantId`) |
+| `GET` | `/api/platform/tenants` | Bearer JWT (`platform_admin=true`) | List all tenants with user/log counts |
 | `POST` | `/api/auth/refresh` | Bearer JWT | Extend panel session (new access token, same `session_started_at` claim) |
 | `GET` | `/api/users` | Bearer JWT | List tenant users (`users:read`) |
 | `POST` | `/api/users/invite` | Bearer JWT | Invite Admin or User (`users:invite`) |

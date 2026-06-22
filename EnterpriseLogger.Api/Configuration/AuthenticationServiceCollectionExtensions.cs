@@ -91,12 +91,20 @@ public static class AuthenticationServiceCollectionExtensions
                 policy.RequireAuthenticatedUser();
                 policy.AddRequirements(new RootOnlyRequirement(), new ActiveTenantRequirement());
             });
+
+            options.AddPolicy(AuthPolicies.PlatformAdminOnly, policy =>
+            {
+                policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme);
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new PlatformAdminRequirement());
+            });
         });
 
         services.AddSingleton<IAuthorizationMiddlewareResultHandler, ProblemDetailsAuthorizationMiddlewareResultHandler>();
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
         services.AddScoped<IAuthorizationHandler, ActiveTenantAuthorizationHandler>();
         services.AddScoped<IAuthorizationHandler, RootOnlyAuthorizationHandler>();
+        services.AddScoped<IAuthorizationHandler, PlatformAdminAuthorizationHandler>();
 
         return services;
     }

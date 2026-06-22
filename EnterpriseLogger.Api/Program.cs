@@ -10,6 +10,8 @@ using EnterpriseLogger.Application.Features.Logs.Queries;
 using EnterpriseLogger.Application.Features.Tenants.Commands;
 using EnterpriseLogger.Application.Features.Users.Commands;
 using EnterpriseLogger.Application.Features.Users.Queries;
+using EnterpriseLogger.Application.Features.Platform.Auth.Commands;
+using EnterpriseLogger.Application.Features.Platform.Tenants.Queries;
 using EnterpriseLogger.Infrastructure.Auth;
 using EnterpriseLogger.Infrastructure.Persistence;
 using EnterpriseLogger.Infrastructure.Security;
@@ -74,6 +76,8 @@ builder.Services.AddScoped<InviteUserCommand>();
 builder.Services.AddScoped<UpdateUserPermissionsCommand>();
 builder.Services.AddScoped<UpdateUserRoleCommand>();
 builder.Services.AddScoped<DeactivateUserCommand>();
+builder.Services.AddScoped<PlatformLoginCommand>();
+builder.Services.AddScoped<GetPlatformTenantsQuery>();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateTenantRequestValidator>();
 
 builder.Services.AddProblemDetails();
@@ -136,7 +140,17 @@ if (isTesting)
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
     await DatabaseSeeder.SeedAsync(db);
+    await PlatformAdminSeeder.SeedTestingAsync(db, hasher);
+}
+
+if (isDevelopment)
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+    var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
+    await PlatformAdminSeeder.SeedDevelopmentAsync(db, hasher);
 }
 
 app.UseExceptionHandler();

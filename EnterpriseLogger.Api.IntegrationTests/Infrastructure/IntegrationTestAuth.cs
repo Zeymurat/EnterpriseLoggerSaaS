@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using EnterpriseLogger.Application.Common.Constants;
+using EnterpriseLogger.Infrastructure.Persistence;
 
 namespace EnterpriseLogger.Api.IntegrationTests.Infrastructure;
 
@@ -52,6 +53,21 @@ public static class IntegrationTestAuth
     public static async Task<string> LoginAsync(HttpClient client, string email, string password)
     {
         var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
+        response.EnsureSuccessStatusCode();
+
+        using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
+        return doc!.RootElement.GetProperty("data").GetProperty("accessToken").GetString()!;
+    }
+
+    public static async Task<string> PlatformLoginAsync(
+        HttpClient client,
+        string? email = null,
+        string? password = null)
+    {
+        email ??= PlatformAdminSeeder.TestEmail;
+        password ??= PlatformAdminSeeder.TestPassword;
+
+        var response = await client.PostAsJsonAsync("/api/platform/auth/login", new { email, password });
         response.EnsureSuccessStatusCode();
 
         using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();

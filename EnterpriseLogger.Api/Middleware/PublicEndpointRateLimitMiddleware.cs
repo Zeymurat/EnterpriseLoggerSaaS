@@ -58,7 +58,8 @@ public class PublicEndpointRateLimitMiddleware
         if (!HttpMethods.IsPost(context.Request.Method))
             return false;
 
-        if (context.Request.Path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase))
+        if (context.Request.Path.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase)
+            || context.Request.Path.Equals("/api/platform/auth/login", StringComparison.OrdinalIgnoreCase))
         {
             bucket = AuthLoginBucket;
             policy = settings.AuthLoginPolicy;

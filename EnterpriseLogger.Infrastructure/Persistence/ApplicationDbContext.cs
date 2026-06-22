@@ -23,6 +23,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
+    public DbSet<PlatformAdmin> PlatformAdmins => Set<PlatformAdmin>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,6 +76,13 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 .WithMany(p => p.UserPermissions)
                 .HasForeignKey(up => up.PermissionId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PlatformAdmin>(entity =>
+        {
+            entity.HasIndex(a => a.Email).IsUnique();
+            entity.Property(a => a.Email).HasMaxLength(256);
+            entity.Property(a => a.PasswordHash).HasMaxLength(512);
         });
 
         modelBuilder.Entity<TenantSubscription>(entity =>

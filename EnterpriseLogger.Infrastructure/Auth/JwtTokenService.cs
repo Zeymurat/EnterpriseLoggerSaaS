@@ -54,4 +54,31 @@ public class JwtTokenService : IJwtTokenService
 
         return new JwtTokenResult(accessToken, (int)(expiresAt - DateTime.UtcNow).TotalSeconds);
     }
+
+    public JwtTokenResult GeneratePlatformToken(int platformAdminId, string email)
+    {
+        var expiresAt = DateTime.UtcNow.AddMinutes(_settings.AccessTokenExpiryMinutes);
+
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, platformAdminId.ToString()),
+            new(ClaimTypes.Email, email),
+            new(AuthClaimTypes.IsPlatformAdmin, "true"),
+        };
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_settings.Secret));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: _settings.Issuer,
+            audience: _settings.Audience,
+            claims: claims,
+            notBefore: DateTime.UtcNow,
+            expires: expiresAt,
+            signingCredentials: credentials);
+
+        var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
+
+        return new JwtTokenResult(accessToken, (int)(expiresAt - DateTime.UtcNow).TotalSeconds);
+    }
 }
