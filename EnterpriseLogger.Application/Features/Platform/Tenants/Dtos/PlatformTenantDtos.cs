@@ -24,7 +24,11 @@ public record PlatformTenantListItemDto(
     SubscriptionStatus? CurrentSubscriptionStatus,
     DateTime? CurrentSubscriptionStartDate);
 
-public record PlatformTenantListResponse(IReadOnlyList<PlatformTenantListItemDto> Tenants);
+public record PlatformTenantListResponse(
+    IReadOnlyList<PlatformTenantListItemDto> Tenants,
+    int TotalCount,
+    int Page,
+    int PageSize);
 
 public record PlatformTenantRootUserDto(int Id, string Email, string Phone);
 

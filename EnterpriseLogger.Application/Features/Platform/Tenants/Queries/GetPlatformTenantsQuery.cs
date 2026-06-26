@@ -18,65 +18,26 @@ public class GetPlatformTenantsQuery
 
     public async Task<Result<PlatformTenantListResponse>> ExecuteAsync(
         PlatformTenantListFilter? filter,
+        int page = 1,
+        int pageSize = PlatformTenantQueryBuilder.DefaultPageSize,
+        string? sortBy = null,
+        bool sortDescending = true,
         CancellationToken cancellationToken = default)
     {
         filter ??= new PlatformTenantListFilter(null, null, null, null, null, null, null);
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1
+            ? PlatformTenantQueryBuilder.DefaultPageSize
+            : Math.Min(pageSize, PlatformTenantQueryBuilder.MaxPageSize);
+
         var now = DateTime.UtcNow;
+        var query = PlatformTenantQueryBuilder.ApplyFilters(_context.Tenants.AsNoTracking(), filter);
+        var totalCount = await query.CountAsync(cancellationToken);
 
-        var query = _context.Tenants.AsNoTracking();
-
-        if (filter.IsActive is bool isActive)
-            query = query.Where(t => t.IsActive == isActive);
-
-        if (!string.IsNullOrWhiteSpace(filter.Name))
-        {
-            var name = filter.Name.Trim().ToLower();
-            query = query.Where(t => t.Name.ToLower().Contains(name));
-        }
-
-        if (!string.IsNullOrWhiteSpace(filter.RootEmail))
-        {
-            var email = filter.RootEmail.Trim().ToLower();
-            query = query.Where(t => t.Users.Any(u =>
-                u.Role == TenantUserRole.Root && u.Email.ToLower().Contains(email)));
-        }
-
-        if (!string.IsNullOrWhiteSpace(filter.RootPhone))
-        {
-            var phone = filter.RootPhone.Trim();
-            query = query.Where(t => t.Users.Any(u =>
-                u.Role == TenantUserRole.Root && u.Phone.Contains(phone)));
-        }
-
-        if (!string.IsNullOrWhiteSpace(filter.PackageCode))
-        {
-            var packageCode = filter.PackageCode.Trim();
-            query = query.Where(t => t.Subscriptions.Any(s =>
-                SubscriptionHelper.ActiveStatuses.Contains(s.Status)
-                && s.EndDate > now
-                && s.Package.Code == packageCode));
-        }
-
-        if (filter.SubscriptionStartFrom is DateTime startFrom)
-        {
-            var fromUtc = DateTime.SpecifyKind(startFrom.Date, DateTimeKind.Utc);
-            query = query.Where(t => t.Subscriptions.Any(s =>
-                SubscriptionHelper.ActiveStatuses.Contains(s.Status)
-                && s.EndDate > now
-                && s.StartDate >= fromUtc));
-        }
-
-        if (filter.SubscriptionStartTo is DateTime startTo)
-        {
-            var toUtc = DateTime.SpecifyKind(startTo.Date.AddDays(1), DateTimeKind.Utc);
-            query = query.Where(t => t.Subscriptions.Any(s =>
-                SubscriptionHelper.ActiveStatuses.Contains(s.Status)
-                && s.EndDate > now
-                && s.StartDate < toUtc));
-        }
-
-        var items = await query
-            .OrderByDescending(t => t.CreatedAt)
+        var items = await PlatformTenantQueryBuilder
+            .ApplySort(query, sortBy, sortDescending)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(t => new PlatformTenantListItemDto(
                 t.Id,
                 t.Name,
@@ -103,6 +64,7 @@ public class GetPlatformTenantsQuery
                     .FirstOrDefault()))
             .ToListAsync(cancellationToken);
 
-        return Result<PlatformTenantListResponse>.Success(new PlatformTenantListResponse(items));
+        return Result<PlatformTenantListResponse>.Success(
+            new PlatformTenantListResponse(items, totalCount, page, pageSize));
     }
 }

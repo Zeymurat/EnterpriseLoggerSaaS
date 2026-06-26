@@ -1,10 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Search, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, Search, X } from 'lucide-react'
+import { toast } from 'sonner'
 import {
+  exportPlatformTenants,
   getPlatformPackages,
   getPlatformTenants,
   type PlatformTenantListFilters,
+  type PlatformTenantSortField,
   subscriptionStatusLabel,
 } from '@/lib/api'
 import { TenantManageSheet } from '@/components/tenants/TenantManageSheet'
@@ -36,6 +39,8 @@ const emptyFilters: PlatformTenantListFilters = {
   subscriptionStartTo: '',
 }
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
+
 function countActiveFilters(filters: PlatformTenantListFilters): number {
   let count = 0
   if (filters.name?.trim()) count++
@@ -53,8 +58,13 @@ export function CustomersPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [draftFilters, setDraftFilters] = useState<PlatformTenantListFilters>(emptyFilters)
   const [appliedFilters, setAppliedFilters] = useState<PlatformTenantListFilters>(emptyFilters)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+  const [sortBy, setSortBy] = useState<PlatformTenantSortField>('createdAt')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [exporting, setExporting] = useState(false)
 
-  const queryFilters = useMemo(
+  const queryOptions = useMemo(
     () => ({
       name: appliedFilters.name || undefined,
       rootEmail: appliedFilters.rootEmail || undefined,
@@ -63,13 +73,17 @@ export function CustomersPage() {
       isActive: appliedFilters.isActive,
       subscriptionStartFrom: appliedFilters.subscriptionStartFrom || undefined,
       subscriptionStartTo: appliedFilters.subscriptionStartTo || undefined,
+      page,
+      pageSize,
+      sortBy,
+      sortDir,
     }),
-    [appliedFilters],
+    [appliedFilters, page, pageSize, sortBy, sortDir],
   )
 
   const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['platform-tenants', queryFilters],
-    queryFn: () => getPlatformTenants(queryFilters),
+    queryKey: ['platform-tenants', queryOptions],
+    queryFn: () => getPlatformTenants(queryOptions),
   })
 
   const packagesQuery = useQuery({
@@ -88,14 +102,49 @@ export function CustomersPage() {
   }
 
   const tenants = data?.tenants ?? []
+  const totalCount = data?.totalCount ?? 0
   const packages = packagesQuery.data?.packages ?? []
   const activeFilterCount = countActiveFilters(appliedFilters)
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1
+  const rangeEnd = Math.min(page * pageSize, totalCount)
 
-  const applyFilters = () => setAppliedFilters({ ...draftFilters })
+  const applyFilters = () => {
+    setAppliedFilters({ ...draftFilters })
+    setPage(1)
+  }
 
   const clearFilters = () => {
     setDraftFilters(emptyFilters)
     setAppliedFilters(emptyFilters)
+    setPage(1)
+  }
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const blob = await exportPlatformTenants({
+        name: appliedFilters.name || undefined,
+        rootEmail: appliedFilters.rootEmail || undefined,
+        rootPhone: appliedFilters.rootPhone || undefined,
+        packageCode: appliedFilters.packageCode || undefined,
+        isActive: appliedFilters.isActive,
+        subscriptionStartFrom: appliedFilters.subscriptionStartFrom || undefined,
+        subscriptionStartTo: appliedFilters.subscriptionStartTo || undefined,
+        sortBy,
+        sortDir,
+      })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'musteriler.csv'
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'CSV dışa aktarımı başarısız.')
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -108,12 +157,27 @@ export function CustomersPage() {
               Kayıtlı tenantlar, paket durumları ve abonelik yönetimi.
             </p>
           </div>
-          {!isLoading && !isError ? (
-            <p className="text-sm text-muted-foreground">
-              {tenants.length} sonuç
-              {activeFilterCount > 0 ? ` · ${activeFilterCount} filtre` : ''}
-            </p>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {!isLoading && !isError ? (
+              <p className="text-sm text-muted-foreground">
+                {totalCount > 0
+                  ? `${formatNumber(rangeStart)}–${formatNumber(rangeEnd)} / ${formatNumber(totalCount)}`
+                  : '0 sonuç'}
+                {activeFilterCount > 0 ? ` · ${activeFilterCount} filtre` : ''}
+              </p>
+            ) : null}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-9"
+              disabled={exporting || isLoading}
+              onClick={handleExport}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {exporting ? 'Dışa aktarılıyor…' : 'CSV'}
+            </Button>
+          </div>
         </div>
 
         <div className="rounded-xl border border-border/60 bg-muted/15 p-2.5 sm:p-3">
@@ -174,73 +238,103 @@ export function CustomersPage() {
               </Select>
             </div>
 
-            <div className="ml-auto flex items-center gap-2">
-            <Button type="button" size="sm" className="h-9" onClick={applyFilters}>
-              Uygula
-            </Button>
-
-            {activeFilterCount > 0 ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-9 px-2 text-muted-foreground"
-                onClick={clearFilters}
-                aria-label="Filtreleri temizle"
+            <div className="w-[9.5rem]">
+              <Select
+                className="h-9"
+                value={sortBy}
+                onChange={(event) => {
+                  setSortBy(event.target.value as PlatformTenantSortField)
+                  setPage(1)
+                }}
               >
-                <X className="h-4 w-4" />
+                <option value="createdAt">Kayıt tarihi</option>
+                <option value="name">Firma adı</option>
+                <option value="isActive">Durum</option>
+                <option value="userCount">Kullanıcı sayısı</option>
+              </Select>
+            </div>
+
+            <div className="w-[7rem]">
+              <Select
+                className="h-9"
+                value={sortDir}
+                onChange={(event) => {
+                  setSortDir(event.target.value as 'asc' | 'desc')
+                  setPage(1)
+                }}
+              >
+                <option value="desc">Azalan</option>
+                <option value="asc">Artan</option>
+              </Select>
+            </div>
+
+            <div className="ml-auto flex items-center gap-2">
+              <Button type="button" size="sm" className="h-9" onClick={applyFilters}>
+                Uygula
               </Button>
-            ) : null}
+
+              {activeFilterCount > 0 ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 px-2 text-muted-foreground"
+                  onClick={clearFilters}
+                  aria-label="Filtreleri temizle"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              ) : null}
             </div>
           </div>
 
           <div className="mt-2.5 grid gap-2 border-t border-border/40 pt-2.5 sm:grid-cols-2 lg:grid-cols-4">
-              <Input
-                className="h-9"
-                placeholder="Root e-posta"
-                value={draftFilters.rootEmail ?? ''}
-                onChange={(event) =>
-                  setDraftFilters((current) => ({ ...current, rootEmail: event.target.value }))
-                }
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') applyFilters()
-                }}
-              />
-              <Input
-                className="h-9"
-                placeholder="Root telefon"
-                value={draftFilters.rootPhone ?? ''}
-                onChange={(event) =>
-                  setDraftFilters((current) => ({ ...current, rootPhone: event.target.value }))
-                }
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter') applyFilters()
-                }}
-              />
-              <Input
-                className="h-9"
-                type="date"
-                title="Paket başlangıç (min)"
-                value={draftFilters.subscriptionStartFrom ?? ''}
-                onChange={(event) =>
-                  setDraftFilters((current) => ({
-                    ...current,
-                    subscriptionStartFrom: event.target.value,
-                  }))
-                }
-              />
-              <Input
-                className="h-9"
-                type="date"
-                title="Paket başlangıç (max)"
-                value={draftFilters.subscriptionStartTo ?? ''}
-                onChange={(event) =>
-                  setDraftFilters((current) => ({
-                    ...current,
-                    subscriptionStartTo: event.target.value,
-                  }))
-                }
-              />
+            <Input
+              className="h-9"
+              placeholder="Root e-posta"
+              value={draftFilters.rootEmail ?? ''}
+              onChange={(event) =>
+                setDraftFilters((current) => ({ ...current, rootEmail: event.target.value }))
+              }
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') applyFilters()
+              }}
+            />
+            <Input
+              className="h-9"
+              placeholder="Root telefon"
+              value={draftFilters.rootPhone ?? ''}
+              onChange={(event) =>
+                setDraftFilters((current) => ({ ...current, rootPhone: event.target.value }))
+              }
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') applyFilters()
+              }}
+            />
+            <Input
+              className="h-9"
+              type="date"
+              title="Paket başlangıç (min)"
+              value={draftFilters.subscriptionStartFrom ?? ''}
+              onChange={(event) =>
+                setDraftFilters((current) => ({
+                  ...current,
+                  subscriptionStartFrom: event.target.value,
+                }))
+              }
+            />
+            <Input
+              className="h-9"
+              type="date"
+              title="Paket başlangıç (max)"
+              value={draftFilters.subscriptionStartTo ?? ''}
+              onChange={(event) =>
+                setDraftFilters((current) => ({
+                  ...current,
+                  subscriptionStartTo: event.target.value,
+                }))
+              }
+            />
           </div>
         </div>
 
@@ -318,6 +412,54 @@ export function CustomersPage() {
             ))}
           </div>
         )}
+
+        {!isLoading && !isError && totalCount > 0 ? (
+          <div className="flex flex-col gap-3 border-t border-border/60 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Sayfa başına</span>
+              <Select
+                className="h-8 w-[4.5rem]"
+                value={String(pageSize)}
+                onChange={(event) => {
+                  setPageSize(Number(event.target.value))
+                  setPage(1)
+                }}
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8"
+                disabled={page <= 1}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-[5rem] text-center text-sm text-muted-foreground">
+                {page} / {totalPages}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8"
+                disabled={page >= totalPages}
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <TenantManageSheet

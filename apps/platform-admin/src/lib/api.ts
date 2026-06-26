@@ -69,8 +69,20 @@ export interface PlatformTenantListFilters {
   subscriptionStartTo?: string
 }
 
+export type PlatformTenantSortField = 'createdAt' | 'name' | 'isActive' | 'userCount'
+
+export interface PlatformTenantListOptions extends PlatformTenantListFilters {
+  page?: number
+  pageSize?: number
+  sortBy?: PlatformTenantSortField
+  sortDir?: 'asc' | 'desc'
+}
+
 export interface PlatformTenantListResponse {
   tenants: PlatformTenantListItem[]
+  totalCount: number
+  page: number
+  pageSize: number
 }
 
 export interface PlatformTenantRootUser {
@@ -372,17 +384,21 @@ export async function platformRefreshSession(): Promise<PlatformLoginResponse> {
 }
 
 export async function getPlatformTenants(
-  filters: PlatformTenantListFilters = {},
+  options: PlatformTenantListOptions = {},
 ): Promise<PlatformTenantListResponse> {
   const params = new URLSearchParams()
 
-  if (filters.name?.trim()) params.set('name', filters.name.trim())
-  if (filters.rootEmail?.trim()) params.set('rootEmail', filters.rootEmail.trim())
-  if (filters.rootPhone?.trim()) params.set('rootPhone', filters.rootPhone.trim())
-  if (filters.packageCode?.trim()) params.set('packageCode', filters.packageCode.trim())
-  if (filters.isActive !== undefined) params.set('isActive', String(filters.isActive))
-  if (filters.subscriptionStartFrom) params.set('subscriptionStartFrom', filters.subscriptionStartFrom)
-  if (filters.subscriptionStartTo) params.set('subscriptionStartTo', filters.subscriptionStartTo)
+  if (options.name?.trim()) params.set('name', options.name.trim())
+  if (options.rootEmail?.trim()) params.set('rootEmail', options.rootEmail.trim())
+  if (options.rootPhone?.trim()) params.set('rootPhone', options.rootPhone.trim())
+  if (options.packageCode?.trim()) params.set('packageCode', options.packageCode.trim())
+  if (options.isActive !== undefined) params.set('isActive', String(options.isActive))
+  if (options.subscriptionStartFrom) params.set('subscriptionStartFrom', options.subscriptionStartFrom)
+  if (options.subscriptionStartTo) params.set('subscriptionStartTo', options.subscriptionStartTo)
+  if (options.page) params.set('page', String(options.page))
+  if (options.pageSize) params.set('pageSize', String(options.pageSize))
+  if (options.sortBy) params.set('sortBy', options.sortBy)
+  if (options.sortDir) params.set('sortDir', options.sortDir)
 
   const query = params.toString()
   const response = await authenticatedFetch(
@@ -390,6 +406,34 @@ export async function getPlatformTenants(
   )
 
   return parseResult<PlatformTenantListResponse>(response)
+}
+
+export async function exportPlatformTenants(
+  options: Omit<PlatformTenantListOptions, 'page' | 'pageSize'> = {},
+): Promise<Blob> {
+  const params = new URLSearchParams()
+
+  if (options.name?.trim()) params.set('name', options.name.trim())
+  if (options.rootEmail?.trim()) params.set('rootEmail', options.rootEmail.trim())
+  if (options.rootPhone?.trim()) params.set('rootPhone', options.rootPhone.trim())
+  if (options.packageCode?.trim()) params.set('packageCode', options.packageCode.trim())
+  if (options.isActive !== undefined) params.set('isActive', String(options.isActive))
+  if (options.subscriptionStartFrom) params.set('subscriptionStartFrom', options.subscriptionStartFrom)
+  if (options.subscriptionStartTo) params.set('subscriptionStartTo', options.subscriptionStartTo)
+  if (options.sortBy) params.set('sortBy', options.sortBy)
+  if (options.sortDir) params.set('sortDir', options.sortDir)
+
+  const query = params.toString()
+  const response = await authenticatedFetch(
+    `${API_URL}/api/platform/tenants/export${query ? `?${query}` : ''}`,
+  )
+
+  if (!response.ok) {
+    await parseResult<unknown>(response)
+    throw new Error('CSV dışa aktarımı başarısız.')
+  }
+
+  return response.blob()
 }
 
 export async function setTenantStatus(tenantId: number, isActive: boolean): Promise<void> {

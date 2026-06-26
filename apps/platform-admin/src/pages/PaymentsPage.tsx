@@ -67,7 +67,7 @@ export function PaymentsPage() {
 
   const tenantsQuery = useQuery({
     queryKey: ['platform-tenants'],
-    queryFn: () => getPlatformTenants(),
+    queryFn: () => getPlatformTenants({ pageSize: 100 }),
   })
 
   const packagesQuery = useQuery({

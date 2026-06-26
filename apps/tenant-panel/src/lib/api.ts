@@ -370,3 +370,25 @@ export async function getBillingNotice(): Promise<TenantBillingNotice> {
   const response = await authFetch('/api/billing/notice')
   return parseResult<TenantBillingNotice>(response)
 }
+
+export interface TenantUsage {
+  packageName: string
+  monthlyLogCount: number
+  monthlyRequestLimit: number
+  logsLastMinute: number
+  maxLogsPerMinute: number
+}
+
+export async function getTenantUsage(): Promise<TenantUsage | null> {
+  const response = await authFetch('/api/billing/usage')
+
+  if (response.status === 400 || response.status === 403) {
+    return null
+  }
+
+  if (!response.ok) {
+    throw new Error('Kota bilgisi alınamadı.')
+  }
+
+  return parseResult<TenantUsage>(response)
+}

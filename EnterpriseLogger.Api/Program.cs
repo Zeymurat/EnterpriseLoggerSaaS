@@ -90,6 +90,7 @@ builder.Services.AddScoped<DeactivateUserCommand>();
 builder.Services.AddScoped<PlatformLoginCommand>();
 builder.Services.AddScoped<PlatformRefreshSessionCommand>();
 builder.Services.AddScoped<GetPlatformTenantsQuery>();
+builder.Services.AddScoped<ExportPlatformTenantsQuery>();
 builder.Services.AddScoped<GetPlatformTenantDetailQuery>();
 builder.Services.AddScoped<AssignTenantSubscriptionCommand>();
 builder.Services.AddScoped<ImpersonateTenantCommand>();
@@ -112,6 +113,7 @@ builder.Services.AddScoped<RejectPlatformPaymentCommand>();
 builder.Services.AddScoped<UpdatePlatformPaymentCommand>();
 builder.Services.AddScoped<DeletePlatformPaymentCommand>();
 builder.Services.AddScoped<GetTenantBillingNoticeQuery>();
+builder.Services.AddScoped<GetTenantUsageQuery>();
 builder.Services.AddValidatorsFromAssemblyContaining<CreateTenantRequestValidator>();
 
 builder.Services.AddProblemDetails();

@@ -18,6 +18,7 @@ namespace EnterpriseLogger.Api.Controllers;
 public class PlatformTenantsController : ControllerBase
 {
     private readonly GetPlatformTenantsQuery _getPlatformTenantsQuery;
+    private readonly ExportPlatformTenantsQuery _exportPlatformTenantsQuery;
     private readonly GetPlatformTenantDetailQuery _getPlatformTenantDetailQuery;
     private readonly AssignTenantSubscriptionCommand _assignTenantSubscriptionCommand;
     private readonly ImpersonateTenantCommand _impersonateTenantCommand;
@@ -30,6 +31,7 @@ public class PlatformTenantsController : ControllerBase
 
     public PlatformTenantsController(
         GetPlatformTenantsQuery getPlatformTenantsQuery,
+        ExportPlatformTenantsQuery exportPlatformTenantsQuery,
         GetPlatformTenantDetailQuery getPlatformTenantDetailQuery,
         AssignTenantSubscriptionCommand assignTenantSubscriptionCommand,
         ImpersonateTenantCommand impersonateTenantCommand,
@@ -41,6 +43,7 @@ public class PlatformTenantsController : ControllerBase
         ResetTenantRootPasswordCommand resetTenantRootPasswordCommand)
     {
         _getPlatformTenantsQuery = getPlatformTenantsQuery;
+        _exportPlatformTenantsQuery = exportPlatformTenantsQuery;
         _getPlatformTenantDetailQuery = getPlatformTenantDetailQuery;
         _assignTenantSubscriptionCommand = assignTenantSubscriptionCommand;
         _impersonateTenantCommand = impersonateTenantCommand;
@@ -61,7 +64,11 @@ public class PlatformTenantsController : ControllerBase
         [FromQuery] bool? isActive,
         [FromQuery] DateTime? subscriptionStartFrom,
         [FromQuery] DateTime? subscriptionStartTo,
-        CancellationToken cancellationToken)
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 25,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortDir = null,
+        CancellationToken cancellationToken = default)
     {
         var filter = new PlatformTenantListFilter(
             name,
@@ -72,8 +79,50 @@ public class PlatformTenantsController : ControllerBase
             subscriptionStartFrom,
             subscriptionStartTo);
 
-        var result = await _getPlatformTenantsQuery.ExecuteAsync(filter, cancellationToken);
+        var sortDescending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+        var result = await _getPlatformTenantsQuery.ExecuteAsync(
+            filter,
+            page,
+            pageSize,
+            sortBy,
+            sortDescending,
+            cancellationToken);
         return Ok(result);
+    }
+
+    [HttpGet("export")]
+    public async Task<IActionResult> Export(
+        [FromQuery] string? name,
+        [FromQuery] string? rootEmail,
+        [FromQuery] string? rootPhone,
+        [FromQuery] string? packageCode,
+        [FromQuery] bool? isActive,
+        [FromQuery] DateTime? subscriptionStartFrom,
+        [FromQuery] DateTime? subscriptionStartTo,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortDir = null,
+        CancellationToken cancellationToken = default)
+    {
+        var filter = new PlatformTenantListFilter(
+            name,
+            rootEmail,
+            rootPhone,
+            packageCode,
+            isActive,
+            subscriptionStartFrom,
+            subscriptionStartTo);
+
+        var sortDescending = !string.Equals(sortDir, "asc", StringComparison.OrdinalIgnoreCase);
+        var result = await _exportPlatformTenantsQuery.ExecuteAsync(
+            filter,
+            sortBy,
+            sortDescending,
+            cancellationToken);
+
+        if (!result.IsSuccess)
+            return BadRequest(result);
+
+        return File(result.Data!, "text/csv; charset=utf-8", "musteriler.csv");
     }
 
     [HttpGet("{id:int}")]

@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button'
 
 import { BillingNoticeBanner } from '@/components/billing/BillingNoticeBanner'
+import { QuotaUsageBanner } from '@/components/billing/QuotaUsageBanner'
 
 import { UserRoleBadge } from '@/components/users/UserRoleBadge'
 
@@ -259,6 +260,7 @@ export function AppLayout() {
           <div className="mx-auto max-w-7xl">
 
             <BillingNoticeBanner />
+            <QuotaUsageBanner />
 
             <Outlet />
 
