@@ -12,6 +12,8 @@ import {
 
   Activity,
 
+  CreditCard,
+
 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
@@ -30,6 +32,8 @@ import { cn } from '@/lib/utils'
 const navItems = [
 
   { to: '/', label: 'Kontrol Paneli', icon: LayoutDashboard },
+
+  { to: '/billing', label: 'Abonelik', icon: CreditCard },
 
   { to: '/logs', label: 'Loglar', icon: ScrollText, permission: 'logs:read' },
 

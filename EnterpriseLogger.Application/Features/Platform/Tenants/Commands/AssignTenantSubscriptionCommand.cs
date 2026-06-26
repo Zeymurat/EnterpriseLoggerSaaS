@@ -1,3 +1,4 @@
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Common.Subscriptions;
@@ -13,13 +14,16 @@ public class AssignTenantSubscriptionCommand
 {
     private readonly IApplicationDbContext _context;
     private readonly IValidator<AssignTenantSubscriptionRequest> _validator;
+    private readonly IPlatformAuditService _auditService;
 
     public AssignTenantSubscriptionCommand(
         IApplicationDbContext context,
-        IValidator<AssignTenantSubscriptionRequest> validator)
+        IValidator<AssignTenantSubscriptionRequest> validator,
+        IPlatformAuditService auditService)
     {
         _context = context;
         _validator = validator;
+        _auditService = auditService;
     }
 
     public async Task<Result<AssignTenantSubscriptionResponse>> ExecuteAsync(
@@ -121,6 +125,14 @@ public class AssignTenantSubscriptionCommand
         await _context.SaveChangesAsync(cancellationToken);
 
         subscription.Package = package;
+
+        await _auditService.LogAsync(
+            PlatformAuditActions.SubscriptionAssigned,
+            "subscription",
+            subscription.Id,
+            tenantId,
+            $"packageId={package.Id};isPaid={subscription.IsPaid}",
+            cancellationToken);
 
         return Result<AssignTenantSubscriptionResponse>.Success(
             new AssignTenantSubscriptionResponse(PlatformSubscriptionMapper.ToDto(subscription)));

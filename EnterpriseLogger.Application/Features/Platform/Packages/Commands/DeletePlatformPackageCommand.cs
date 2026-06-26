@@ -1,3 +1,4 @@
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
 using Microsoft.EntityFrameworkCore;
@@ -7,10 +8,14 @@ namespace EnterpriseLogger.Application.Features.Platform.Packages.Commands;
 public class DeletePlatformPackageCommand
 {
     private readonly IApplicationDbContext _context;
+    private readonly IPlatformAuditService _auditService;
 
-    public DeletePlatformPackageCommand(IApplicationDbContext context)
+    public DeletePlatformPackageCommand(
+        IApplicationDbContext context,
+        IPlatformAuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     public async Task<Result<bool>> ExecuteAsync(int packageId, CancellationToken cancellationToken = default)
@@ -41,6 +46,14 @@ public class DeletePlatformPackageCommand
 
         _context.Packages.Remove(package);
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _auditService.LogAsync(
+            PlatformAuditActions.PackageDeleted,
+            "package",
+            packageId,
+            null,
+            $"code={package.Code}",
+            cancellationToken);
 
         return Result<bool>.Success(true);
     }

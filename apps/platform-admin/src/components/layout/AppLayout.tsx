@@ -1,13 +1,16 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
-import { Building2, CreditCard, LogOut, Package } from 'lucide-react'
+import { Building2, CreditCard, LayoutDashboard, LogOut, Package, RefreshCw, ScrollText } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 const navItems = [
+  { to: '/dashboard', label: 'Kontrol Paneli', icon: LayoutDashboard },
   { to: '/customers', label: 'Müşteriler', icon: Building2 },
   { to: '/packages', label: 'Paketler', icon: Package },
   { to: '/payments', label: 'Ödemeler', icon: CreditCard },
+  { to: '/renewals', label: 'Yenilemeler', icon: RefreshCw },
+  { to: '/audit-logs', label: 'Denetim', icon: ScrollText },
 ]
 
 function SidebarLink({

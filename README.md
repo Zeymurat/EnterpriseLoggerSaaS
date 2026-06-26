@@ -148,6 +148,8 @@ dotnet ef database update \
   --startup-project EnterpriseLogger.Api
 ```
 
+Recent migrations include `AddPlatformAuditAndNotifications` (platform audit log + notification dispatch dedup tables).
+
 ### 4. Run the API
 
 ```bash
@@ -194,12 +196,22 @@ dotnet test
 | `POST` | `/api/tenants/me/api-key/rotate` | Bearer JWT (Root, `apikeys:rotate`) | Generate or rotate tenant API key (shown once) |
 | `POST` | `/api/auth/login` | — | Panel login (email + password → JWT) |
 | `POST` | `/api/platform/auth/login` | — | Platform admin login (separate JWT, no `tenantId`) |
-| `GET` | `/api/platform/tenants` | Bearer JWT (`platform_admin=true`) | List all tenants with user/log counts |
+| `GET` | `/api/platform/tenants` | Bearer JWT (`platform_admin=true`) | List tenants (paginated; filters, sort, CSV export) |
+| `GET` | `/api/platform/tenants/export` | Bearer JWT (`platform_admin=true`) | Export filtered tenant list as CSV |
 | `GET` | `/api/platform/tenants/{id}` | Bearer JWT (`platform_admin=true`) | Tenant detail + subscription history |
 | `POST` | `/api/platform/tenants/{id}/subscription` | Bearer JWT (`platform_admin=true`) | Assign or change tenant package (closes previous subscription) |
-| `POST` | `/api/platform/tenants/{id}/impersonate` | Bearer JWT (`platform_admin=true`) | Issue Root user JWT for tenant panel login-as |
+| `POST` | `/api/platform/tenants/{id}/impersonate` | Bearer JWT (`platform_admin=true`) | Issue login-as ticket for tenant panel |
 | `GET` | `/api/platform/packages` | Bearer JWT (`platform_admin=true`) | List subscription packages |
+| `POST` | `/api/platform/packages` | Bearer JWT (`platform_admin=true`) | Create package |
 | `PUT` | `/api/platform/packages/{id}` | Bearer JWT (`platform_admin=true`) | Update package quotas and pricing |
+| `DELETE` | `/api/platform/packages/{id}` | Bearer JWT (`platform_admin=true`) | Delete package (if no subscriptions/payments) |
+| `GET` | `/api/platform/payments` | Bearer JWT (`platform_admin=true`) | List payments (filter by status) |
+| `GET` | `/api/platform/dashboard` | Bearer JWT (`platform_admin=true`) | Platform KPIs (tenants, payments, renewals, quota) |
+| `GET` | `/api/platform/renewals` | Bearer JWT (`platform_admin=true`) | Upcoming / pending / grace-expired subscriptions |
+| `GET` | `/api/platform/audit-logs` | Bearer JWT (`platform_admin=true`) | Platform admin action audit log (paginated) |
+| `GET` | `/api/billing/notice` | Bearer JWT | Tenant billing notice (pending payment banner) |
+| `GET` | `/api/billing/usage` | Bearer JWT | Tenant quota usage (monthly + per-minute) |
+| `GET` | `/api/billing/overview` | Bearer JWT | Tenant subscription summary + recent payments |
 | `POST` | `/api/auth/refresh` | Bearer JWT | Extend panel session (new access token, same `session_started_at` claim) |
 | `GET` | `/api/users` | Bearer JWT | List tenant users (`users:read`) |
 | `POST` | `/api/users/invite` | Bearer JWT | Invite Admin or User (`users:invite`) |
@@ -288,7 +300,7 @@ Retry with an explicit tenant:
 
 Send the tenant API key for machine integration, or a JWT from login for the admin panel. In Swagger, use **Authorize** for either `X-Api-Key` or `Bearer`.
 
-**Rate limiting:** `POST /api/logs` is limited per tenant via Redis (fixed window). Default: **1000 requests / 60 seconds** (`LOG_INGEST_RATE_LIMIT_PER_MINUTE`, `LOG_INGEST_RATE_LIMIT_WINDOW_SECONDS`). `POST /api/auth/login` and `POST /api/tenants` are limited per client IP (defaults: **20** and **5** requests / 60 seconds). **Login lockout:** after repeated failed attempts per email or IP, accounts are locked (default **10** email / **30** IP failures → **15 min** lockout) with exponential backoff from the 3rd failure. Exceeding limits returns `429 Too Many Requests` with RFC 7807 Problem Details and a `Retry-After` header. `GET /api/logs` is not rate limited.
+**Rate limiting:** `POST /api/logs` is limited **per tenant** by the active package (`MaxLogsPerMinute` via Redis fixed window). Monthly volume is enforced in `CreateLogCommand` (`MonthlyRequestLimit`). `LOG_INGEST_RATE_LIMIT_*` in `.env` are legacy policy defaults only. `POST /api/auth/login` and `POST /api/tenants` are limited per client IP (defaults: **20** and **5** requests / 60 seconds). **Login lockout:** after repeated failed attempts per email or IP, accounts are locked (default **10** email / **30** IP failures → **15 min** lockout) with exponential backoff from the 3rd failure. Exceeding limits returns `429 Too Many Requests` with RFC 7807 Problem Details and a `Retry-After` header. `GET /api/logs` is not rate limited.
 
 ### User management (JWT only)
 
@@ -383,6 +395,30 @@ In the tenant panel:
 - Click a log row to open the **log detail sheet** (request type, URL, status, actor, correlation id, exception type when available).
 - **Empty & error UX:** new tenants with zero logs see an onboarding card (API key + integration docs). Filtered searches with no matches show a clear empty table state. API/network failures surface a reusable error card with retry — network outages map to a friendly *"Sunucuya ulaşılamadı"* message from the shared `apiFetch` layer (no Axios interceptors).
 - **Correlation trace:** log detail sheet → *İlişkili istekleri filtrele* opens `/logs?correlationId=…` and lists the full request chain (`GET /api/logs?correlationId=` exact match).
+- **Billing & quota:** `/billing` shows subscription, grace period, retention, and payment history (`GET /api/billing/overview`). Layout banners show payment notices and quota usage; critical usage (≥90%) is highlighted.
+
+### Platform admin (http://localhost:5174)
+
+| Page | Route | Description |
+|------|-------|-------------|
+| Kontrol Paneli | `/dashboard` | KPIs: tenants, pending payments, renewals, high-quota tenants |
+| Müşteriler | `/customers` | Paginated tenant list, filters, sort, CSV export, tenant sheet |
+| Paketler | `/packages` | Package CRUD, quotas, log levels, pricing |
+| Ödemeler | `/payments` | Manual havale/EFT payment workflow (record, confirm, reject) |
+| Yenilemeler | `/renewals` | Pending payment, upcoming auto-renew, grace-expired subscriptions |
+| Denetim | `/audit-logs` | Platform admin action history (tenant ops, payments, packages, login-as) |
+
+Login-as uses a short-lived ticket → tenant panel `/impersonate` (requires `TENANT_PANEL_URL` / `VITE_TENANT_PANEL_URL`).
+
+### Background jobs (API process)
+
+| Service | Interval | Purpose |
+|---------|----------|---------|
+| `SubscriptionRenewalHostedService` | 1 h | Auto-renew subscriptions, grace expiry → Free downgrade |
+| `BillingNotificationHostedService` | 1 h | E-mail: payment due, grace reminder, quota ≥90% (SMTP + `IsMailEnabled`) |
+| `LogRetentionHostedService` | 24 h | Delete logs older than package `StorageRetentionDays` |
+
+Skipped in `Testing` environment (integration tests). Disabled when `EMAIL_NOTIFICATIONS_ENABLED=false`.
 
 ### Error responses
 
@@ -408,11 +444,19 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 
 **JWT variables** (see `.env.example`): `JWT_SECRET` (min 32 chars), `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_ACCESS_TOKEN_EXPIRY_MINUTES`, `JWT_MAX_SESSION_HOURS`.
 
-**Redis & rate limiting** (see `.env.example`): `REDIS_CONNECTION_STRING`; log ingestion (`LOG_INGEST_RATE_LIMIT_*`, per tenant on `POST /api/logs`); public endpoints (`AUTH_LOGIN_RATE_LIMIT_*`, `TENANT_REGISTER_RATE_LIMIT_*`, per IP); login lockout (`LOGIN_MAX_FAILED_ATTEMPTS_EMAIL`, `LOGIN_MAX_FAILED_ATTEMPTS_IP`, `LOGIN_LOCKOUT_MINUTES`, `LOGIN_BACKOFF_START_AFTER`, etc.). Set `TRUST_FORWARDED_HEADERS=true` only behind a trusted reverse proxy — otherwise clients can spoof `X-Forwarded-For` to bypass IP limits. Integration tests use in-memory implementations (no Redis in CI).
+**Redis & rate limiting** (see `.env.example`): `REDIS_CONNECTION_STRING`; log ingest limits are **package-based** (`MaxLogsPerMinute` / `MonthlyRequestLimit` per tenant); public endpoints (`AUTH_LOGIN_RATE_LIMIT_*`, `TENANT_REGISTER_RATE_LIMIT_*`, per IP); login lockout (`LOGIN_MAX_FAILED_ATTEMPTS_EMAIL`, `LOGIN_MAX_FAILED_ATTEMPTS_IP`, `LOGIN_LOCKOUT_MINUTES`, `LOGIN_BACKOFF_START_AFTER`, etc.). Set `TRUST_FORWARDED_HEADERS=true` only behind a trusted reverse proxy — otherwise clients can spoof `X-Forwarded-For` to bypass IP limits. Integration tests use in-memory implementations (no Redis in CI).
 
-**CORS** (tenant panel): `CORS_ALLOWED_ORIGINS` — comma-separated origins; default `http://localhost:5173`.
+**Billing & subscriptions:** `SUBSCRIPTION_PAYMENT_GRACE_DAYS` (default 7) — days after auto-renew before downgrade to Free when payment is missing.
+
+**E-mail notifications** (optional): set `EMAIL_NOTIFICATIONS_ENABLED=true` and SMTP vars (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_FROM_NAME`, `SMTP_USE_SSL`). Tenant must have an active package with `IsMailEnabled`. Sends: payment due on renewal, grace reminder (3 days before expiry), monthly quota warning (≥90%).
+
+**CORS** (frontends): `CORS_ALLOWED_ORIGINS` — comma-separated origins; default `http://localhost:5173,http://localhost:5174`.
+
+**Login-as:** `TENANT_PANEL_URL` — base URL for platform admin impersonate redirect (default `http://localhost:5173`).
 
 **Frontend** (`apps/tenant-panel/.env`): `VITE_API_URL`, `VITE_SESSION_IDLE_MINUTES`, `VITE_SESSION_WARN_MINUTES` (see `apps/tenant-panel/.env.example`).
+
+**Frontend** (`apps/platform-admin/.env`): `VITE_API_URL`, `VITE_TENANT_PANEL_URL`, `VITE_SESSION_IDLE_MINUTES`, `VITE_SESSION_WARN_MINUTES` (see `apps/platform-admin/.env.example`).
 
 ---
 
@@ -458,6 +502,12 @@ In **Production**, Problem Details responses do **not** include stack traces or 
 - [x] Idle session warning + JWT refresh (`POST /api/auth/refresh`)
 - [x] Redis for rate limits / quotas
 - [x] GitHub Actions CI (`build` + `test`)
+- [x] Platform admin (customers, packages, payments, subscriptions)
+- [x] Package-based per-tenant quotas (monthly + per-minute)
+- [x] Platform dashboard, renewals view, audit log
+- [x] Tenant billing overview page + quota usage warnings
+- [x] Log retention enforcement (package `StorageRetentionDays`)
+- [x] SMTP e-mail notifications (payment due, grace reminder, quota warning)
 
 ---
 

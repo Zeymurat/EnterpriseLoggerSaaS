@@ -1,3 +1,4 @@
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Common.Subscriptions;
@@ -13,15 +14,18 @@ public class CancelTenantSubscriptionCommand
     private readonly IApplicationDbContext _context;
     private readonly SubscriptionLifecycleService _lifecycleService;
     private readonly IValidator<CancelTenantSubscriptionRequest> _validator;
+    private readonly IPlatformAuditService _auditService;
 
     public CancelTenantSubscriptionCommand(
         IApplicationDbContext context,
         SubscriptionLifecycleService lifecycleService,
-        IValidator<CancelTenantSubscriptionRequest> validator)
+        IValidator<CancelTenantSubscriptionRequest> validator,
+        IPlatformAuditService auditService)
     {
         _context = context;
         _lifecycleService = lifecycleService;
         _validator = validator;
+        _auditService = auditService;
     }
 
     public async Task<Result<CancelTenantSubscriptionResponse>> ExecuteAsync(
@@ -63,6 +67,14 @@ public class CancelTenantSubscriptionCommand
             return Result<CancelTenantSubscriptionResponse>.Failure(
                 "Abonelik iptal edildi ancak Free paket atanamadı.");
         }
+
+        await _auditService.LogAsync(
+            PlatformAuditActions.SubscriptionCancelled,
+            "subscription",
+            current.Id,
+            tenantId,
+            request.Reason,
+            cancellationToken);
 
         return Result<CancelTenantSubscriptionResponse>.Success(
             new CancelTenantSubscriptionResponse(PlatformSubscriptionMapper.ToDto(current)));

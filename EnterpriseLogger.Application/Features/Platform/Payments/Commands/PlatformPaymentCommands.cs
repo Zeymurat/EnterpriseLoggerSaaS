@@ -1,3 +1,4 @@
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Common.Subscriptions;
@@ -13,13 +14,16 @@ public class RecordPlatformPaymentCommand
 {
     private readonly IApplicationDbContext _context;
     private readonly IValidator<RecordPlatformPaymentRequest> _validator;
+    private readonly IPlatformAuditService _auditService;
 
     public RecordPlatformPaymentCommand(
         IApplicationDbContext context,
-        IValidator<RecordPlatformPaymentRequest> validator)
+        IValidator<RecordPlatformPaymentRequest> validator,
+        IPlatformAuditService auditService)
     {
         _context = context;
         _validator = validator;
+        _auditService = auditService;
     }
 
     public async Task<Result<PlatformPaymentDto>> ExecuteAsync(
@@ -62,6 +66,14 @@ public class RecordPlatformPaymentCommand
 
         _context.Payments.Add(payment);
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _auditService.LogAsync(
+            PlatformAuditActions.PaymentRecorded,
+            "payment",
+            payment.Id,
+            request.TenantId,
+            $"amount={payment.Amount}",
+            cancellationToken);
 
         return Result<PlatformPaymentDto>.Success(Map(payment, tenant.Name, package.Name, null));
     }
@@ -107,10 +119,14 @@ public class RecordPlatformPaymentRequestValidator : AbstractValidator<RecordPla
 public class ConfirmPlatformPaymentCommand
 {
     private readonly IApplicationDbContext _context;
+    private readonly IPlatformAuditService _auditService;
 
-    public ConfirmPlatformPaymentCommand(IApplicationDbContext context)
+    public ConfirmPlatformPaymentCommand(
+        IApplicationDbContext context,
+        IPlatformAuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     public async Task<Result<PlatformPaymentDto>> ExecuteAsync(
@@ -143,6 +159,13 @@ public class ConfirmPlatformPaymentCommand
             .Select(s => (int?)s.Id)
             .FirstOrDefaultAsync(cancellationToken);
 
+        await _auditService.LogAsync(
+            PlatformAuditActions.PaymentConfirmed,
+            "payment",
+            payment.Id,
+            payment.TenantId,
+            cancellationToken: cancellationToken);
+
         return Result<PlatformPaymentDto>.Success(
             RecordPlatformPaymentCommand.Map(payment, payment.Tenant.Name, payment.Package.Name, linkedId));
     }
@@ -151,10 +174,14 @@ public class ConfirmPlatformPaymentCommand
 public class RejectPlatformPaymentCommand
 {
     private readonly IApplicationDbContext _context;
+    private readonly IPlatformAuditService _auditService;
 
-    public RejectPlatformPaymentCommand(IApplicationDbContext context)
+    public RejectPlatformPaymentCommand(
+        IApplicationDbContext context,
+        IPlatformAuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     public async Task<Result<PlatformPaymentDto>> ExecuteAsync(
@@ -179,6 +206,13 @@ public class RejectPlatformPaymentCommand
 
         await _context.SaveChangesAsync(cancellationToken);
 
+        await _auditService.LogAsync(
+            PlatformAuditActions.PaymentRejected,
+            "payment",
+            payment.Id,
+            payment.TenantId,
+            cancellationToken: cancellationToken);
+
         return Result<PlatformPaymentDto>.Success(
             RecordPlatformPaymentCommand.Map(payment, payment.Tenant.Name, payment.Package.Name, null));
     }
@@ -188,13 +222,16 @@ public class UpdatePlatformPaymentCommand
 {
     private readonly IApplicationDbContext _context;
     private readonly IValidator<UpdatePlatformPaymentRequest> _validator;
+    private readonly IPlatformAuditService _auditService;
 
     public UpdatePlatformPaymentCommand(
         IApplicationDbContext context,
-        IValidator<UpdatePlatformPaymentRequest> validator)
+        IValidator<UpdatePlatformPaymentRequest> validator,
+        IPlatformAuditService auditService)
     {
         _context = context;
         _validator = validator;
+        _auditService = auditService;
     }
 
     public async Task<Result<PlatformPaymentDto>> ExecuteAsync(
@@ -243,6 +280,13 @@ public class UpdatePlatformPaymentCommand
 
         await _context.SaveChangesAsync(cancellationToken);
 
+        await _auditService.LogAsync(
+            PlatformAuditActions.PaymentUpdated,
+            "payment",
+            payment.Id,
+            payment.TenantId,
+            cancellationToken: cancellationToken);
+
         return Result<PlatformPaymentDto>.Success(
             RecordPlatformPaymentCommand.Map(payment, payment.Tenant.Name, package.Name, null));
     }
@@ -263,10 +307,14 @@ public class UpdatePlatformPaymentRequestValidator : AbstractValidator<UpdatePla
 public class DeletePlatformPaymentCommand
 {
     private readonly IApplicationDbContext _context;
+    private readonly IPlatformAuditService _auditService;
 
-    public DeletePlatformPaymentCommand(IApplicationDbContext context)
+    public DeletePlatformPaymentCommand(
+        IApplicationDbContext context,
+        IPlatformAuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     public async Task<Result<bool>> ExecuteAsync(int paymentId, CancellationToken cancellationToken = default)
@@ -288,6 +336,13 @@ public class DeletePlatformPaymentCommand
 
         _context.Payments.Remove(payment);
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _auditService.LogAsync(
+            PlatformAuditActions.PaymentDeleted,
+            "payment",
+            paymentId,
+            payment.TenantId,
+            cancellationToken: cancellationToken);
 
         return Result<bool>.Success(true);
     }

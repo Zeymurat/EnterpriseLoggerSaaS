@@ -14,13 +14,16 @@ public class BillingController : ControllerBase
 {
     private readonly GetTenantBillingNoticeQuery _getTenantBillingNoticeQuery;
     private readonly GetTenantUsageQuery _getTenantUsageQuery;
+    private readonly GetTenantBillingOverviewQuery _getTenantBillingOverviewQuery;
 
     public BillingController(
         GetTenantBillingNoticeQuery getTenantBillingNoticeQuery,
-        GetTenantUsageQuery getTenantUsageQuery)
+        GetTenantUsageQuery getTenantUsageQuery,
+        GetTenantBillingOverviewQuery getTenantBillingOverviewQuery)
     {
         _getTenantBillingNoticeQuery = getTenantBillingNoticeQuery;
         _getTenantUsageQuery = getTenantUsageQuery;
+        _getTenantBillingOverviewQuery = getTenantBillingOverviewQuery;
     }
 
     [HttpGet("notice")]
@@ -44,6 +47,17 @@ public class BillingController : ControllerBase
 
         if (!result.IsSuccess)
             return BadRequest(result);
+
+        return Ok(result);
+    }
+
+    [HttpGet("overview")]
+    public async Task<ActionResult<Result<TenantBillingOverviewDto>>> Overview(CancellationToken cancellationToken)
+    {
+        var result = await _getTenantBillingOverviewQuery.ExecuteAsync(cancellationToken);
+
+        if (!result.IsSuccess && result.ErrorKind == ResultErrorKind.Forbidden)
+            return StatusCode(StatusCodes.Status403Forbidden, result);
 
         return Ok(result);
     }

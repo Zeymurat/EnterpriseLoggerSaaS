@@ -392,3 +392,60 @@ export async function getTenantUsage(): Promise<TenantUsage | null> {
 
   return parseResult<TenantUsage>(response)
 }
+
+export const PaymentStatus = {
+  Pending: 0,
+  Confirmed: 1,
+  Rejected: 2,
+} as const
+
+export type PaymentStatusValue = (typeof PaymentStatus)[keyof typeof PaymentStatus]
+
+export interface TenantPaymentSummary {
+  id: number
+  amount: number
+  currency: string
+  status: PaymentStatusValue
+  referenceNumber: string
+  periodStart: string
+  periodEnd: string
+  createdAt: string
+  confirmedAt: string | null
+}
+
+export interface TenantBillingOverview {
+  hasActiveSubscription: boolean
+  packageName: string | null
+  packageCode: string | null
+  status: number | null
+  billingCycle: number | null
+  startDate: string | null
+  endDate: string | null
+  gracePeriodEndDate: string | null
+  isPaid: boolean
+  autoRenew: boolean
+  storageRetentionDays: number
+  monthlyRequestLimit: number
+  maxLogsPerMinute: number
+  showPaymentNotice: boolean
+  paymentNoticeMessage: string | null
+  recentPayments: TenantPaymentSummary[]
+}
+
+export async function getTenantBillingOverview(): Promise<TenantBillingOverview> {
+  const response = await authFetch('/api/billing/overview')
+  return parseResult<TenantBillingOverview>(response)
+}
+
+export function paymentStatusLabel(status: PaymentStatusValue): string {
+  switch (status) {
+    case PaymentStatus.Pending:
+      return 'Bekliyor'
+    case PaymentStatus.Confirmed:
+      return 'Onaylandı'
+    case PaymentStatus.Rejected:
+      return 'Reddedildi'
+    default:
+      return 'Bilinmiyor'
+  }
+}

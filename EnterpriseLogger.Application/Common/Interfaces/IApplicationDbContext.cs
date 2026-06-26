@@ -18,6 +18,8 @@ public interface IApplicationDbContext
     DbSet<UserPermission> UserPermissions { get; }
     DbSet<PlatformAdmin> PlatformAdmins { get; }
     DbSet<Payment> Payments { get; }
+    DbSet<PlatformAuditLog> PlatformAuditLogs { get; }
+    DbSet<NotificationDispatchLog> NotificationDispatchLogs { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

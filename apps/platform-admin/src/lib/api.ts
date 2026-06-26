@@ -668,3 +668,120 @@ export async function deletePlatformTenant(tenantId: number): Promise<void> {
 }
 
 export const PAYMENT_GRACE_DAY_OPTIONS = [7, 10, 15, 21, 30] as const
+
+export interface PlatformDashboard {
+  totalTenants: number
+  activeTenants: number
+  pendingPayments: number
+  pendingRenewals: number
+  upcomingRenewals: number
+  graceExpiringSoon: number
+  highQuotaTenants: number
+  topQuotaTenants: Array<{
+    tenantId: number
+    tenantName: string
+    packageName: string
+    monthlyLogCount: number
+    monthlyLimit: number
+    usagePercent: number
+  }>
+}
+
+export async function getPlatformDashboard(): Promise<PlatformDashboard> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/dashboard`)
+  return parseResult<PlatformDashboard>(response)
+}
+
+export interface PlatformRenewalItem {
+  tenantId: number
+  tenantName: string
+  packageName: string
+  status: SubscriptionStatusValue
+  startDate: string
+  endDate: string
+  gracePeriodEndDate: string | null
+  isPaid: boolean
+  autoRenew: boolean
+  category: string
+}
+
+export async function getPlatformRenewals(): Promise<{ items: PlatformRenewalItem[] }> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/renewals`)
+  return parseResult<{ items: PlatformRenewalItem[] }>(response)
+}
+
+export interface PlatformAuditLogItem {
+  id: number
+  platformAdminId: number | null
+  actorEmail: string
+  action: string
+  entityType: string
+  entityId: number | null
+  tenantId: number | null
+  tenantName: string | null
+  details: string | null
+  createdAt: string
+}
+
+export interface PlatformAuditLogListResponse {
+  items: PlatformAuditLogItem[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export async function getPlatformAuditLogs(options: {
+  page?: number
+  pageSize?: number
+  tenantId?: number
+  action?: string
+} = {}): Promise<PlatformAuditLogListResponse> {
+  const params = new URLSearchParams()
+  if (options.page) params.set('page', String(options.page))
+  if (options.pageSize) params.set('pageSize', String(options.pageSize))
+  if (options.tenantId) params.set('tenantId', String(options.tenantId))
+  if (options.action?.trim()) params.set('action', options.action.trim())
+  const query = params.toString()
+  const response = await authenticatedFetch(
+    `${API_URL}/api/platform/audit-logs${query ? `?${query}` : ''}`,
+  )
+  return parseResult<PlatformAuditLogListResponse>(response)
+}
+
+export function auditActionLabel(action: string): string {
+  const labels: Record<string, string> = {
+    'tenant.status_changed': 'Tenant durumu değişti',
+    'tenant.deleted': 'Tenant silindi',
+    'tenant.root_password_reset': 'Root şifre sıfırlandı',
+    'tenant.impersonated': 'Login-as',
+    'subscription.assigned': 'Abonelik atandı',
+    'subscription.cancelled': 'Abonelik iptal',
+    'subscription.removed': 'Abonelik kaldırıldı',
+    'subscription.payment_linked': 'Ödeme bağlandı',
+    'payment.recorded': 'Ödeme kaydı',
+    'payment.confirmed': 'Ödeme onaylandı',
+    'payment.rejected': 'Ödeme reddedildi',
+    'payment.updated': 'Ödeme güncellendi',
+    'payment.deleted': 'Ödeme silindi',
+    'package.created': 'Paket oluşturuldu',
+    'package.updated': 'Paket güncellendi',
+    'package.deleted': 'Paket silindi',
+    'system.subscription_renewal': 'Otomatik yenileme',
+    'system.grace_expired': 'Grace süresi doldu',
+    'system.log_retention': 'Log retention',
+  }
+  return labels[action] ?? action
+}
+
+export function renewalCategoryLabel(category: string): string {
+  switch (category) {
+    case 'payment_pending':
+      return 'Ödeme bekliyor'
+    case 'upcoming_renewal':
+      return 'Yaklaşan yenileme'
+    case 'grace_expired':
+      return 'Grace süresi doldu'
+    default:
+      return category
+  }
+}

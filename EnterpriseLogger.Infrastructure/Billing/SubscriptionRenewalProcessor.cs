@@ -1,3 +1,4 @@
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Settings;
 using EnterpriseLogger.Application.Common.Subscriptions;
@@ -11,15 +12,18 @@ public class SubscriptionRenewalProcessor
     private readonly IApplicationDbContext _context;
     private readonly SubscriptionLifecycleService _lifecycle;
     private readonly BillingSettings _settings;
+    private readonly IPlatformAuditService _auditService;
 
     public SubscriptionRenewalProcessor(
         IApplicationDbContext context,
         SubscriptionLifecycleService lifecycle,
-        BillingSettings settings)
+        BillingSettings settings,
+        IPlatformAuditService auditService)
     {
         _context = context;
         _lifecycle = lifecycle;
         _settings = settings;
+        _auditService = auditService;
     }
 
     public async Task ProcessAsync(CancellationToken cancellationToken = default)
@@ -97,6 +101,14 @@ public class SubscriptionRenewalProcessor
 
             renewal.Status = SubscriptionStatus.PendingPayment;
             _context.TenantSubscriptions.Add(renewal);
+
+            await _auditService.LogSystemAsync(
+                PlatformAuditActions.SystemSubscriptionRenewal,
+                "subscription",
+                null,
+                current.TenantId,
+                $"packageId={current.PackageId}",
+                cancellationToken);
         }
     }
 }

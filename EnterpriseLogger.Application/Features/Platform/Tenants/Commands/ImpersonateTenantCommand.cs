@@ -1,4 +1,5 @@
 using EnterpriseLogger.Application.Common.Authorization;
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Features.Auth.Dtos;
@@ -15,15 +16,18 @@ public class ImpersonateTenantCommand
     private readonly IApplicationDbContext _context;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IImpersonationTicketStore _ticketStore;
+    private readonly IPlatformAuditService _auditService;
 
     public ImpersonateTenantCommand(
         IApplicationDbContext context,
         IJwtTokenService jwtTokenService,
-        IImpersonationTicketStore ticketStore)
+        IImpersonationTicketStore ticketStore,
+        IPlatformAuditService auditService)
     {
         _context = context;
         _jwtTokenService = jwtTokenService;
         _ticketStore = ticketStore;
+        _auditService = auditService;
     }
 
     public async Task<Result<ImpersonateTenantTicketDto>> ExecuteAsync(
@@ -79,6 +83,14 @@ public class ImpersonateTenantCommand
                 permissions));
 
         var ticket = _ticketStore.CreateTicket(session, TicketTtl);
+
+        await _auditService.LogAsync(
+            PlatformAuditActions.TenantImpersonated,
+            "tenant",
+            tenantId,
+            tenantId,
+            $"rootUserId={rootUser.Id}",
+            cancellationToken);
 
         return Result<ImpersonateTenantTicketDto>.Success(
             new ImpersonateTenantTicketDto(ticket, (int)TicketTtl.TotalSeconds));

@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
-import { Activity } from 'lucide-react'
+import { Activity, AlertTriangle } from 'lucide-react'
 import { getTenantUsage } from '@/lib/api'
 import { cn } from '@/lib/utils'
+
+const WARNING_THRESHOLD = 90
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('tr-TR').format(value)
@@ -13,7 +15,7 @@ function usagePercent(used: number, limit: number): number {
 }
 
 function usageTone(percent: number): string {
-  if (percent >= 90) return 'bg-destructive'
+  if (percent >= WARNING_THRESHOLD) return 'bg-destructive'
   if (percent >= 70) return 'bg-status-warning'
   return 'bg-primary'
 }
@@ -60,8 +62,30 @@ export function QuotaUsageBanner() {
     return null
   }
 
+  const monthlyPercent = usagePercent(data.monthlyLogCount, data.monthlyRequestLimit)
+  const minutePercent = usagePercent(data.logsLastMinute, data.maxLogsPerMinute)
+  const showWarning =
+    monthlyPercent >= WARNING_THRESHOLD || minutePercent >= WARNING_THRESHOLD
+
   return (
-    <div className="mb-6 rounded-xl border border-border/60 bg-muted/20 px-4 py-3">
+    <div
+      className={cn(
+        'mb-6 rounded-xl border px-4 py-3',
+        showWarning
+          ? 'border-destructive/30 bg-destructive/5'
+          : 'border-border/60 bg-muted/20',
+      )}
+    >
+      {showWarning ? (
+        <div className="mb-3 flex items-start gap-2 text-sm text-destructive">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            Kota kullanımınız kritik seviyede (%{WARNING_THRESHOLD}+). Yeni log gönderimi
+            kısa sürede engellenebilir.
+          </p>
+        </div>
+      ) : null}
+
       <div className="mb-3 flex items-center gap-2 text-sm font-medium">
         <Activity className="h-4 w-4 text-muted-foreground" />
         <span>Kota kullanımı</span>

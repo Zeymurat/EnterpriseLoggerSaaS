@@ -22,6 +22,38 @@ namespace EnterpriseLogger.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("EnterpriseLogger.Domain.Entities.NotificationDispatchLog", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("NotificationType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ReferenceKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("SentAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "NotificationType", "ReferenceKey")
+                        .IsUnique();
+
+                    b.ToTable("NotificationDispatchLogs");
+                });
+
             modelBuilder.Entity("EnterpriseLogger.Domain.Entities.Package", b =>
                 {
                     b.Property<int>("Id")
@@ -336,6 +368,58 @@ namespace EnterpriseLogger.Infrastructure.Migrations
                     b.ToTable("PlatformAdmins");
                 });
 
+            modelBuilder.Entity("EnterpriseLogger.Domain.Entities.PlatformAuditLog", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ActorEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Details")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int?>("EntityId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int?>("PlatformAdminId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Action");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("PlatformAdminId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("PlatformAuditLogs");
+                });
+
             modelBuilder.Entity("EnterpriseLogger.Domain.Entities.SystemLog", b =>
                 {
                     b.Property<long>("Id")
@@ -553,6 +637,17 @@ namespace EnterpriseLogger.Infrastructure.Migrations
                     b.ToTable("UserPermissions");
                 });
 
+            modelBuilder.Entity("EnterpriseLogger.Domain.Entities.NotificationDispatchLog", b =>
+                {
+                    b.HasOne("EnterpriseLogger.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("EnterpriseLogger.Domain.Entities.Payment", b =>
                 {
                     b.HasOne("EnterpriseLogger.Domain.Entities.Package", "Package")
@@ -568,6 +663,23 @@ namespace EnterpriseLogger.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Package");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("EnterpriseLogger.Domain.Entities.PlatformAuditLog", b =>
+                {
+                    b.HasOne("EnterpriseLogger.Domain.Entities.PlatformAdmin", "PlatformAdmin")
+                        .WithMany()
+                        .HasForeignKey("PlatformAdminId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("EnterpriseLogger.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("PlatformAdmin");
 
                     b.Navigation("Tenant");
                 });

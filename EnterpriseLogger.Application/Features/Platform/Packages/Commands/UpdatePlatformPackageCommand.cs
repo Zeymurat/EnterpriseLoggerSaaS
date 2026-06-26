@@ -1,3 +1,4 @@
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Packages;
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
@@ -11,13 +12,16 @@ public class UpdatePlatformPackageCommand
 {
     private readonly IApplicationDbContext _context;
     private readonly IValidator<UpdatePlatformPackageRequest> _validator;
+    private readonly IPlatformAuditService _auditService;
 
     public UpdatePlatformPackageCommand(
         IApplicationDbContext context,
-        IValidator<UpdatePlatformPackageRequest> validator)
+        IValidator<UpdatePlatformPackageRequest> validator,
+        IPlatformAuditService auditService)
     {
         _context = context;
         _validator = validator;
+        _auditService = auditService;
     }
 
     public async Task<Result<PlatformPackageDto>> ExecuteAsync(
@@ -53,6 +57,14 @@ public class UpdatePlatformPackageCommand
         package.SortOrder = request.SortOrder;
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _auditService.LogAsync(
+            PlatformAuditActions.PackageUpdated,
+            "package",
+            packageId,
+            null,
+            $"code={package.Code}",
+            cancellationToken);
 
         return Result<PlatformPackageDto>.Success(PlatformPackageMapper.ToDto(package));
     }

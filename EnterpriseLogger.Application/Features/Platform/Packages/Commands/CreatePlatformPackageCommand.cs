@@ -1,5 +1,6 @@
-using EnterpriseLogger.Application.Common.Packages;
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
+using EnterpriseLogger.Application.Common.Packages;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Features.Platform.Packages.Dtos;
 using FluentValidation;
@@ -11,13 +12,16 @@ public class CreatePlatformPackageCommand
 {
     private readonly IApplicationDbContext _context;
     private readonly IValidator<CreatePlatformPackageRequest> _validator;
+    private readonly IPlatformAuditService _auditService;
 
     public CreatePlatformPackageCommand(
         IApplicationDbContext context,
-        IValidator<CreatePlatformPackageRequest> validator)
+        IValidator<CreatePlatformPackageRequest> validator,
+        IPlatformAuditService auditService)
     {
         _context = context;
         _validator = validator;
+        _auditService = auditService;
     }
 
     public async Task<Result<PlatformPackageDto>> ExecuteAsync(
@@ -61,6 +65,14 @@ public class CreatePlatformPackageCommand
 
         _context.Packages.Add(package);
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _auditService.LogAsync(
+            PlatformAuditActions.PackageCreated,
+            "package",
+            package.Id,
+            null,
+            $"code={package.Code}",
+            cancellationToken);
 
         return Result<PlatformPackageDto>.Success(PlatformPackageMapper.ToDto(package));
     }

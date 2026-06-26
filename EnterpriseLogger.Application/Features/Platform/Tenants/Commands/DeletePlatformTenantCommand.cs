@@ -1,3 +1,4 @@
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
 using Microsoft.EntityFrameworkCore;
@@ -7,10 +8,14 @@ namespace EnterpriseLogger.Application.Features.Platform.Tenants.Commands;
 public class DeletePlatformTenantCommand
 {
     private readonly IApplicationDbContext _context;
+    private readonly IPlatformAuditService _auditService;
 
-    public DeletePlatformTenantCommand(IApplicationDbContext context)
+    public DeletePlatformTenantCommand(
+        IApplicationDbContext context,
+        IPlatformAuditService auditService)
     {
         _context = context;
+        _auditService = auditService;
     }
 
     public async Task<Result<bool>> ExecuteAsync(int tenantId, CancellationToken cancellationToken = default)
@@ -65,6 +70,14 @@ public class DeletePlatformTenantCommand
 
         _context.Tenants.Remove(tenant);
         await _context.SaveChangesAsync(cancellationToken);
+
+        await _auditService.LogAsync(
+            PlatformAuditActions.TenantDeleted,
+            "tenant",
+            tenantId,
+            tenantId,
+            $"name={tenant.Name}",
+            cancellationToken);
 
         return Result<bool>.Success(true);
     }

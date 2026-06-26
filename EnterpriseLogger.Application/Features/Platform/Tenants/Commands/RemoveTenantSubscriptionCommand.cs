@@ -1,3 +1,4 @@
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Common.Subscriptions;
@@ -11,13 +12,16 @@ public class RemoveTenantSubscriptionCommand
 {
     private readonly IApplicationDbContext _context;
     private readonly SubscriptionLifecycleService _lifecycleService;
+    private readonly IPlatformAuditService _auditService;
 
     public RemoveTenantSubscriptionCommand(
         IApplicationDbContext context,
-        SubscriptionLifecycleService lifecycleService)
+        SubscriptionLifecycleService lifecycleService,
+        IPlatformAuditService auditService)
     {
         _context = context;
         _lifecycleService = lifecycleService;
+        _auditService = auditService;
     }
 
     public async Task<Result<RemoveTenantSubscriptionResponse>> ExecuteAsync(
@@ -50,6 +54,13 @@ public class RemoveTenantSubscriptionCommand
             _context.TenantSubscriptions,
             tenantId,
             cancellationToken);
+
+        await _auditService.LogAsync(
+            PlatformAuditActions.SubscriptionRemoved,
+            "subscription",
+            subscriptionId,
+            tenantId,
+            cancellationToken: cancellationToken);
 
         return Result<RemoveTenantSubscriptionResponse>.Success(
             new RemoveTenantSubscriptionResponse(

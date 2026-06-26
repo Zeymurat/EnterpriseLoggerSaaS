@@ -1,3 +1,4 @@
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Common.Subscriptions;
@@ -13,13 +14,16 @@ public class LinkSubscriptionPaymentCommand
 {
     private readonly IApplicationDbContext _context;
     private readonly IValidator<LinkSubscriptionPaymentRequest> _validator;
+    private readonly IPlatformAuditService _auditService;
 
     public LinkSubscriptionPaymentCommand(
         IApplicationDbContext context,
-        IValidator<LinkSubscriptionPaymentRequest> validator)
+        IValidator<LinkSubscriptionPaymentRequest> validator,
+        IPlatformAuditService auditService)
     {
         _context = context;
         _validator = validator;
+        _auditService = auditService;
     }
 
     public async Task<Result<LinkSubscriptionPaymentResponse>> ExecuteAsync(
@@ -104,6 +108,14 @@ public class LinkSubscriptionPaymentCommand
         await _context.SaveChangesAsync(cancellationToken);
 
         subscription.Payment = payment;
+
+        await _auditService.LogAsync(
+            PlatformAuditActions.SubscriptionPaymentLinked,
+            "subscription",
+            subscription.Id,
+            tenantId,
+            $"paymentId={payment.Id}",
+            cancellationToken);
 
         return Result<LinkSubscriptionPaymentResponse>.Success(
             new LinkSubscriptionPaymentResponse(PlatformSubscriptionMapper.ToDto(subscription)));

@@ -12,6 +12,7 @@ import { AuthPage } from '@/pages/AuthPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { LogsPage } from '@/pages/LogsPage'
 import { UsersPage } from '@/pages/UsersPage'
+import { BillingPage } from '@/pages/BillingPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,6 +40,7 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route element={<AppLayout />}>
                 <Route path="/" element={<DashboardPage />} />
+                <Route path="/billing" element={<BillingPage />} />
                 <Route path="/logs" element={<LogsPage />} />
                 <Route path="/users" element={<UsersPage />} />
               </Route>

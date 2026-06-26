@@ -25,6 +25,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
     public DbSet<PlatformAdmin> PlatformAdmins => Set<PlatformAdmin>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<PlatformAuditLog> PlatformAuditLogs => Set<PlatformAuditLog>();
+    public DbSet<NotificationDispatchLog> NotificationDispatchLogs => Set<NotificationDispatchLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -139,6 +141,42 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
             entity.HasIndex(p => new { p.TenantId, p.Status, p.CreatedAt });
             entity.HasIndex(p => p.ReferenceNumber);
+        });
+
+        modelBuilder.Entity<PlatformAuditLog>(entity =>
+        {
+            entity.Property(log => log.ActorEmail).HasMaxLength(256);
+            entity.Property(log => log.Action).HasMaxLength(128);
+            entity.Property(log => log.EntityType).HasMaxLength(64);
+            entity.Property(log => log.Details).HasMaxLength(2000);
+
+            entity.HasOne(log => log.PlatformAdmin)
+                .WithMany()
+                .HasForeignKey(log => log.PlatformAdminId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(log => log.Tenant)
+                .WithMany()
+                .HasForeignKey(log => log.TenantId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(log => log.CreatedAt);
+            entity.HasIndex(log => log.PlatformAdminId);
+            entity.HasIndex(log => log.TenantId);
+            entity.HasIndex(log => log.Action);
+        });
+
+        modelBuilder.Entity<NotificationDispatchLog>(entity =>
+        {
+            entity.Property(n => n.NotificationType).HasMaxLength(64);
+            entity.Property(n => n.ReferenceKey).HasMaxLength(128);
+
+            entity.HasOne(n => n.Tenant)
+                .WithMany()
+                .HasForeignKey(n => n.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(n => new { n.TenantId, n.NotificationType, n.ReferenceKey }).IsUnique();
         });
 
         modelBuilder.Entity<SystemLog>(entity =>

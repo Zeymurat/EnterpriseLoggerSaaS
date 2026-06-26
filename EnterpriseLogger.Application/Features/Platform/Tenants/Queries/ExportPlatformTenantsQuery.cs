@@ -71,7 +71,7 @@ public class ExportPlatformTenantsQuery
             builder.Append(Csv(row.RootEmail)).Append(',');
             builder.Append(Csv(row.RootPhone)).Append(',');
             builder.Append(Csv(row.PackageName)).Append(',');
-            builder.Append(Csv(row.SubscriptionStatus?.ToString())).Append(',');
+            builder.Append(Csv(SubscriptionStatusLabels.ToTurkish(row.SubscriptionStatus))).Append(',');
             builder.Append(Csv(row.SubscriptionStart?.ToString("o", CultureInfo.InvariantCulture))).Append(',');
             builder.Append(Csv(row.CreatedAt.ToString("o", CultureInfo.InvariantCulture))).Append(',');
             builder.Append(row.UserCount).Append(',');
