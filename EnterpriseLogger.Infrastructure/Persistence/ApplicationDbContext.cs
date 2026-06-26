@@ -24,6 +24,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
     public DbSet<PlatformAdmin> PlatformAdmins => Set<PlatformAdmin>();
+    public DbSet<Payment> Payments => Set<Payment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -106,6 +107,38 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                   .HasForeignKey(s => s.PackageId);
 
             entity.HasIndex(s => new { s.TenantId, s.StartDate });
+
+            entity.HasOne(s => s.Payment)
+                .WithOne(p => p.Subscription)
+                .HasForeignKey<TenantSubscription>(s => s.PaymentId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasIndex(s => s.PaymentId)
+                .IsUnique()
+                .HasFilter("\"PaymentId\" IS NOT NULL");
+
+            entity.Property(s => s.CancellationReason).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<Payment>(entity =>
+        {
+            entity.Property(p => p.Currency).HasMaxLength(8);
+            entity.Property(p => p.Method).HasMaxLength(32);
+            entity.Property(p => p.ReferenceNumber).HasMaxLength(128);
+            entity.Property(p => p.Notes).HasMaxLength(1000);
+
+            entity.HasOne(p => p.Tenant)
+                .WithMany()
+                .HasForeignKey(p => p.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(p => p.Package)
+                .WithMany()
+                .HasForeignKey(p => p.PackageId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasIndex(p => new { p.TenantId, p.Status, p.CreatedAt });
+            entity.HasIndex(p => p.ReferenceNumber);
         });
 
         modelBuilder.Entity<SystemLog>(entity =>

@@ -73,4 +73,19 @@ public class AuthController : ControllerBase
 
         return Ok(result);
     }
+
+    [AllowAnonymous]
+    [HttpPost("impersonate/{ticket}")]
+    public async Task<ActionResult<Result<LoginResponse>>> ConsumeImpersonationTicket(
+        string ticket,
+        [FromServices] ConsumeImpersonationTicketCommand consumeCommand,
+        CancellationToken cancellationToken)
+    {
+        var result = await consumeCommand.ExecuteAsync(ticket, cancellationToken);
+
+        if (!result.IsSuccess)
+            return Unauthorized(result);
+
+        return Ok(result);
+    }
 }

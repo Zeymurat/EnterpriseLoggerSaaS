@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import { platformLogin, type PlatformAdminInfo } from '@/lib/api'
+import { platformLogin, platformRefreshSession, type PlatformAdminInfo } from '@/lib/api'
 import {
   clearSession,
   getAccessToken,
@@ -7,12 +7,14 @@ import {
   saveSession,
   type PlatformAuthSession,
 } from '@/lib/auth'
+import { recordSessionActivity } from '@/lib/session-activity'
 
 interface AuthContextValue {
   admin: PlatformAdminInfo | null
   accessToken: string | null
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
+  refreshSession: () => Promise<void>
   logout: () => void
 }
 
@@ -34,6 +36,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     saveSession(next)
     setSession(next)
+    recordSessionActivity()
+  }, [])
+
+  const refreshSession = useCallback(async () => {
+    const response = await platformRefreshSession()
+    const next: PlatformAuthSession = {
+      accessToken: response.accessToken,
+      admin: response.admin,
+    }
+    saveSession(next)
+    setSession(next)
+    recordSessionActivity()
   }, [])
 
   const logout = useCallback(() => {
@@ -47,9 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accessToken: session?.accessToken ?? null,
       isAuthenticated: session !== null,
       login,
+      refreshSession,
       logout,
     }),
-    [session, login, logout],
+    [session, login, refreshSession, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

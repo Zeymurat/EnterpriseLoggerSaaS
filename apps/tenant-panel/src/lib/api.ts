@@ -188,6 +188,14 @@ export async function registerTenant(request: RegisterTenantRequest): Promise<Te
   return parseResult<TenantRegistration>(response)
 }
 
+export async function consumeImpersonationTicket(ticket: string): Promise<LoginResponse> {
+  const response = await apiFetch(`${API_URL}/api/auth/impersonate/${encodeURIComponent(ticket)}`, {
+    method: 'POST',
+  })
+
+  return parseResult<LoginResponse>(response)
+}
+
 export async function refreshSession(): Promise<LoginResponse> {
   const response = await authFetch('/api/auth/refresh', { method: 'POST' })
   return parseResult<LoginResponse>(response)
@@ -347,4 +355,18 @@ export async function deactivateUser(userId: number): Promise<TenantUser> {
     method: 'PATCH',
   })
   return parseResult<TenantUser>(response)
+}
+
+export interface TenantBillingNotice {
+  showNotice: boolean
+  packageName: string | null
+  paymentDueBy: string | null
+  periodEnd: string | null
+  message: string | null
+  billingCycle: number | null
+}
+
+export async function getBillingNotice(): Promise<TenantBillingNotice> {
+  const response = await authFetch('/api/billing/notice')
+  return parseResult<TenantBillingNotice>(response)
 }

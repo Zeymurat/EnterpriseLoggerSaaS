@@ -16,6 +16,7 @@ interface AuthContextValue {
   accessToken: string | null
   isAuthenticated: boolean
   login: (request: LoginRequest) => Promise<void>
+  establishSession: (session: AuthSession) => void
   refreshSession: () => Promise<void>
   logout: () => void
   can: (permission: string) => boolean
@@ -37,6 +38,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accessToken: response.accessToken,
       user: response.user,
     }
+    saveSession(next)
+    setSession(next)
+    recordSessionActivity()
+  }, [])
+
+  const establishSession = useCallback((next: AuthSession) => {
     saveSession(next)
     setSession(next)
     recordSessionActivity()
@@ -64,11 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       accessToken: session?.accessToken ?? null,
       isAuthenticated: session !== null,
       login,
+      establishSession,
       refreshSession,
       logout,
       can: (permission: string) => hasPermission(session?.user ?? null, permission),
     }),
-    [session, login, refreshSession, logout],
+    [session, login, establishSession, refreshSession, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

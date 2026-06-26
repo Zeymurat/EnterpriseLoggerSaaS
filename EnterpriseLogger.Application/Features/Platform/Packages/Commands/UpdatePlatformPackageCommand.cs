@@ -1,3 +1,4 @@
+using EnterpriseLogger.Application.Common.Packages;
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Features.Platform.Packages.Dtos;
@@ -37,7 +38,8 @@ public class UpdatePlatformPackageCommand
 
         package.Name = request.Name.Trim();
         package.Description = request.Description.Trim();
-        package.AllowedLogLevels = request.AllowedLogLevels.Trim();
+        package.AllowedLogLevels = PackageLogLevelHelper.Serialize(
+            PackageLogLevelHelper.Parse(request.AllowedLogLevels));
         package.IsMailEnabled = request.IsMailEnabled;
         package.IsSmsEnabled = request.IsSmsEnabled;
         package.MonthlyRequestLimit = request.MonthlyRequestLimit;
@@ -65,7 +67,9 @@ public class UpdatePlatformPackageRequestValidator : AbstractValidator<UpdatePla
             .MaximumLength(100);
 
         RuleFor(x => x.Description).MaximumLength(500);
-        RuleFor(x => x.AllowedLogLevels).NotEmpty().MaximumLength(128);
+        RuleFor(x => x.AllowedLogLevels)
+            .Must(PackageLogLevelHelper.IsValidSelection)
+            .WithMessage("En az bir geçerli log seviyesi seçilmelidir (INFO, WARNING, ERROR).");
         RuleFor(x => x.MonthlyRequestLimit).GreaterThan(0);
         RuleFor(x => x.MaxLogsPerMinute).GreaterThan(0);
         RuleFor(x => x.StorageRetentionDays).GreaterThan(0);

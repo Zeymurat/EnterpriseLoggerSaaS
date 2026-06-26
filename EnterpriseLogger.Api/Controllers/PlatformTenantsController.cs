@@ -21,24 +21,58 @@ public class PlatformTenantsController : ControllerBase
     private readonly GetPlatformTenantDetailQuery _getPlatformTenantDetailQuery;
     private readonly AssignTenantSubscriptionCommand _assignTenantSubscriptionCommand;
     private readonly ImpersonateTenantCommand _impersonateTenantCommand;
+    private readonly DeletePlatformTenantCommand _deletePlatformTenantCommand;
+    private readonly LinkSubscriptionPaymentCommand _linkSubscriptionPaymentCommand;
+    private readonly CancelTenantSubscriptionCommand _cancelTenantSubscriptionCommand;
+    private readonly RemoveTenantSubscriptionCommand _removeTenantSubscriptionCommand;
+    private readonly SetTenantStatusCommand _setTenantStatusCommand;
+    private readonly ResetTenantRootPasswordCommand _resetTenantRootPasswordCommand;
 
     public PlatformTenantsController(
         GetPlatformTenantsQuery getPlatformTenantsQuery,
         GetPlatformTenantDetailQuery getPlatformTenantDetailQuery,
         AssignTenantSubscriptionCommand assignTenantSubscriptionCommand,
-        ImpersonateTenantCommand impersonateTenantCommand)
+        ImpersonateTenantCommand impersonateTenantCommand,
+        DeletePlatformTenantCommand deletePlatformTenantCommand,
+        LinkSubscriptionPaymentCommand linkSubscriptionPaymentCommand,
+        CancelTenantSubscriptionCommand cancelTenantSubscriptionCommand,
+        RemoveTenantSubscriptionCommand removeTenantSubscriptionCommand,
+        SetTenantStatusCommand setTenantStatusCommand,
+        ResetTenantRootPasswordCommand resetTenantRootPasswordCommand)
     {
         _getPlatformTenantsQuery = getPlatformTenantsQuery;
         _getPlatformTenantDetailQuery = getPlatformTenantDetailQuery;
         _assignTenantSubscriptionCommand = assignTenantSubscriptionCommand;
         _impersonateTenantCommand = impersonateTenantCommand;
+        _deletePlatformTenantCommand = deletePlatformTenantCommand;
+        _linkSubscriptionPaymentCommand = linkSubscriptionPaymentCommand;
+        _cancelTenantSubscriptionCommand = cancelTenantSubscriptionCommand;
+        _removeTenantSubscriptionCommand = removeTenantSubscriptionCommand;
+        _setTenantStatusCommand = setTenantStatusCommand;
+        _resetTenantRootPasswordCommand = resetTenantRootPasswordCommand;
     }
 
     [HttpGet]
     public async Task<ActionResult<Result<PlatformTenantListResponse>>> List(
+        [FromQuery] string? name,
+        [FromQuery] string? rootEmail,
+        [FromQuery] string? rootPhone,
+        [FromQuery] string? packageCode,
+        [FromQuery] bool? isActive,
+        [FromQuery] DateTime? subscriptionStartFrom,
+        [FromQuery] DateTime? subscriptionStartTo,
         CancellationToken cancellationToken)
     {
-        var result = await _getPlatformTenantsQuery.ExecuteAsync(cancellationToken);
+        var filter = new PlatformTenantListFilter(
+            name,
+            rootEmail,
+            rootPhone,
+            packageCode,
+            isActive,
+            subscriptionStartFrom,
+            subscriptionStartTo);
+
+        var result = await _getPlatformTenantsQuery.ExecuteAsync(filter, cancellationToken);
         return Ok(result);
     }
 
@@ -75,7 +109,7 @@ public class PlatformTenantsController : ControllerBase
     }
 
     [HttpPost("{id:int}/impersonate")]
-    public async Task<ActionResult<Result<LoginResponse>>> Impersonate(
+    public async Task<ActionResult<Result<ImpersonateTenantTicketDto>>> Impersonate(
         int id,
         CancellationToken cancellationToken)
     {
@@ -91,6 +125,104 @@ public class PlatformTenantsController : ControllerBase
 
             return BadRequest(result);
         }
+
+        return Ok(result);
+    }
+
+    [HttpPost("{id:int}/subscription/cancel")]
+    public async Task<ActionResult<Result<CancelTenantSubscriptionResponse>>> CancelSubscription(
+        int id,
+        [FromBody] CancelTenantSubscriptionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _cancelTenantSubscriptionCommand.ExecuteAsync(id, request, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.ErrorKind == ResultErrorKind.NotFound)
+                return NotFound(result);
+
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    [HttpDelete("{id:int}/subscriptions/{subscriptionId:int}")]
+    public async Task<ActionResult<Result<RemoveTenantSubscriptionResponse>>> RemoveSubscription(
+        int id,
+        int subscriptionId,
+        CancellationToken cancellationToken)
+    {
+        var result = await _removeTenantSubscriptionCommand.ExecuteAsync(id, subscriptionId, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.ErrorKind == ResultErrorKind.NotFound)
+                return NotFound(result);
+
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    [HttpPost("{id:int}/subscription/link-payment")]
+    public async Task<ActionResult<Result<LinkSubscriptionPaymentResponse>>> LinkSubscriptionPayment(
+        int id,
+        [FromBody] LinkSubscriptionPaymentRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _linkSubscriptionPaymentCommand.ExecuteAsync(id, request, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.ErrorKind == ResultErrorKind.NotFound)
+                return NotFound(result);
+
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    [HttpPatch("{id:int}/status")]
+    public async Task<ActionResult<Result<bool>>> SetStatus(
+        int id,
+        [FromBody] SetTenantStatusRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _setTenantStatusCommand.ExecuteAsync(id, request.IsActive, cancellationToken);
+
+        if (!result.IsSuccess && result.ErrorKind == ResultErrorKind.NotFound)
+            return NotFound(result);
+
+        return Ok(result);
+    }
+
+    [HttpPost("{id:int}/root-password/reset")]
+    public async Task<ActionResult<Result<ResetTenantRootPasswordResponse>>> ResetRootPassword(
+        int id,
+        CancellationToken cancellationToken)
+    {
+        var result = await _resetTenantRootPasswordCommand.ExecuteAsync(id, cancellationToken);
+
+        if (!result.IsSuccess && result.ErrorKind == ResultErrorKind.NotFound)
+            return NotFound(result);
+
+        return Ok(result);
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<ActionResult<Result<bool>>> Delete(int id, CancellationToken cancellationToken)
+    {
+        var result = await _deletePlatformTenantCommand.ExecuteAsync(id, cancellationToken);
+
+        if (!result.IsSuccess && result.ErrorKind == ResultErrorKind.NotFound)
+            return NotFound(result);
+
+        if (!result.IsSuccess)
+            return BadRequest(result);
 
         return Ok(result);
     }

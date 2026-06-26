@@ -1,5 +1,6 @@
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
+using EnterpriseLogger.Application.Common.Subscriptions;
 using EnterpriseLogger.Application.Features.Platform.Packages.Dtos;
 using Microsoft.EntityFrameworkCore;
 
@@ -17,13 +18,31 @@ public class GetPlatformPackagesQuery
     public async Task<Result<PlatformPackageListResponse>> ExecuteAsync(
         CancellationToken cancellationToken = default)
     {
+        var now = DateTime.UtcNow;
+
         var packages = await _context.Packages
             .AsNoTracking()
             .OrderBy(p => p.SortOrder)
             .ThenBy(p => p.Id)
             .ToListAsync(cancellationToken);
 
-        var items = packages.Select(PlatformPackageMapper.ToDto).ToList();
+        var activeTenantCounts = await _context.TenantSubscriptions
+            .AsNoTracking()
+            .Where(s => SubscriptionHelper.ActiveStatuses.Contains(s.Status) && s.EndDate > now)
+            .GroupBy(s => s.PackageId)
+            .Select(g => new
+            {
+                PackageId = g.Key,
+                Count = g.Select(s => s.TenantId).Distinct().Count(),
+            })
+            .ToDictionaryAsync(x => x.PackageId, x => x.Count, cancellationToken);
+
+        var items = packages
+            .Select(package => PlatformPackageMapper.ToDto(
+                package,
+                activeTenantCounts.GetValueOrDefault(package.Id)))
+            .ToList();
+
         return Result<PlatformPackageListResponse>.Success(new PlatformPackageListResponse(items));
     }
 }

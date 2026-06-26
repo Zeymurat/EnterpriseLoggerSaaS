@@ -1,42 +1,43 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
-import { saveSession } from '@/lib/auth'
-import type { UserInfo } from '@/lib/api'
+import { useAuth } from '@/contexts/AuthContext'
+import { consumeImpersonationTicket } from '@/lib/api'
 
 export function ImpersonatePage() {
   const [searchParams] = useSearchParams()
+  const { establishSession } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    const raw = searchParams.get('session')
-    if (!raw) {
-      setError('Oturum bilgisi bulunamadı.')
+    const ticket = searchParams.get('ticket')?.trim()
+    if (!ticket) {
+      setError('Login-as bağlantısı geçersiz.')
       return
     }
 
-    try {
-      const decoded = JSON.parse(atob(decodeURIComponent(raw))) as {
-        accessToken: string
-        user: UserInfo
-      }
+    let cancelled = false
 
-      if (!decoded.accessToken || !decoded.user) {
-        setError('Geçersiz oturum verisi.')
-        return
-      }
+    void consumeImpersonationTicket(ticket)
+      .then((session) => {
+        if (cancelled) return
 
-      saveSession({
-        accessToken: decoded.accessToken,
-        user: decoded.user,
+        establishSession({
+          accessToken: session.accessToken,
+          user: session.user,
+        })
+        window.history.replaceState({}, '', '/impersonate')
+        setReady(true)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setError('Oturum açılamadı. Lütfen platform admin panelinden tekrar deneyin.')
       })
 
-      window.history.replaceState({}, '', '/impersonate')
-      setReady(true)
-    } catch {
-      setError('Oturum açılamadı. Lütfen platform admin panelinden tekrar deneyin.')
+    return () => {
+      cancelled = true
     }
-  }, [searchParams])
+  }, [searchParams, establishSession])
 
   if (error) {
     return (

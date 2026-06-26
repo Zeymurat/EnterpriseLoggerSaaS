@@ -30,8 +30,33 @@ public class LogIngestRateLimitTests
         using var doc = await limited.Content.ReadFromJsonAsync<JsonDocument>();
         Assert.Equal("İstek limiti aşıldı", doc!.RootElement.GetProperty("title").GetString());
         Assert.Contains(
-            "limiti aşıldı",
+            "kotası aşıldı",
             doc.RootElement.GetProperty("detail").GetString(),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PostLogs_ExceedingMonthlyPackageLimit_ReturnsBadRequest()
+    {
+        await using var factory = new LowRateLimitWebApplicationFactory
+        {
+            RequestsPerWindow = 10_000,
+            MonthlyRequestLimit = 2,
+        };
+        using var client = factory.CreateClient();
+
+        var apiKey = await IntegrationTestAuth.RegisterLoginAndRotateApiKeyAsync(client, "Monthly Quota Tenant");
+
+        Assert.Equal(HttpStatusCode.OK, (await PostLogAsync(client, apiKey, "Log 1")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await PostLogAsync(client, apiKey, "Log 2")).StatusCode);
+
+        var limited = await PostLogAsync(client, apiKey, "Log 3");
+        Assert.Equal(HttpStatusCode.BadRequest, limited.StatusCode);
+
+        using var doc = await limited.Content.ReadFromJsonAsync<JsonDocument>();
+        Assert.Contains(
+            "Aylık log kotası",
+            doc!.RootElement.GetProperty("errorMessage").GetString() ?? string.Empty,
             StringComparison.OrdinalIgnoreCase);
     }
 

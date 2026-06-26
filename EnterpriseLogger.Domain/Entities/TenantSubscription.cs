@@ -15,7 +15,11 @@ public class TenantSubscription
     public BillingCycle BillingCycle { get; set; } = BillingCycle.Monthly;
     public bool AutoRenew { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public int? PaymentId { get; set; }
+    public DateTime? CancelledAt { get; set; }
+    public string? CancellationReason { get; set; }
 
     public Tenant Tenant { get; set; } = null!;
     public Package Package { get; set; } = null!;
+    public Payment? Payment { get; set; }
 }

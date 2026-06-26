@@ -11,12 +11,17 @@ public class CreateLogCommandTests
 {
     private readonly Mock<IApplicationDbContext> _mockContext = new();
     private readonly Mock<ICurrentTenantProvider> _mockTenantProvider = new();
+    private readonly Mock<ITenantPackageQuotaProvider> _mockQuotaProvider = new();
     private readonly IValidator<CreateLogRequest> _validator = new CreateLogRequestValidator();
     private readonly CreateLogCommand _command;
 
     public CreateLogCommandTests()
     {
-        _command = new CreateLogCommand(_mockContext.Object, _mockTenantProvider.Object, _validator);
+        _command = new CreateLogCommand(
+            _mockContext.Object,
+            _mockTenantProvider.Object,
+            _mockQuotaProvider.Object,
+            _validator);
     }
 
     [Fact]

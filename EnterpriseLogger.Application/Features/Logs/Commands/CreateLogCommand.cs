@@ -1,8 +1,11 @@
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
+using EnterpriseLogger.Application.Common.Packages;
+using EnterpriseLogger.Application.Common.Subscriptions;
 using EnterpriseLogger.Application.Features.Logs.Dtos;
 using EnterpriseLogger.Domain.Entities;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 
 namespace EnterpriseLogger.Application.Features.Logs.Commands;
 
@@ -12,15 +15,18 @@ public class CreateLogCommand
 
     private readonly IApplicationDbContext _context;
     private readonly ICurrentTenantProvider _tenantProvider;
+    private readonly ITenantPackageQuotaProvider _quotaProvider;
     private readonly IValidator<CreateLogRequest> _validator;
 
     public CreateLogCommand(
         IApplicationDbContext context,
         ICurrentTenantProvider tenantProvider,
+        ITenantPackageQuotaProvider quotaProvider,
         IValidator<CreateLogRequest> validator)
     {
         _context = context;
         _tenantProvider = tenantProvider;
+        _quotaProvider = quotaProvider;
         _validator = validator;
     }
 
@@ -38,11 +44,44 @@ public class CreateLogCommand
             return Result<LogResponseDto>.Failure($"Validasyon hatası: {errors}");
         }
 
+        var tenantId = _tenantProvider.TenantId!.Value;
+        var normalizedLevel = NormalizeLogLevel(request.LogLevel);
+
+        var activeSubscription = await SubscriptionHelper.GetActiveSubscriptionAsync(
+            _context.TenantSubscriptions.AsNoTracking(),
+            tenantId,
+            cancellationToken);
+
+        if (activeSubscription is null)
+        {
+            return Result<LogResponseDto>.Failure("Aktif abonelik bulunamadı.");
+        }
+
+        if (!PackageLogLevelHelper.IsAllowed(activeSubscription.Package.AllowedLogLevels, normalizedLevel))
+        {
+            return Result<LogResponseDto>.Failure(
+                "Bu log seviyesi mevcut paketiniz için izinli değil.");
+        }
+
+        var quota = await _quotaProvider.GetAsync(tenantId, cancellationToken);
+        if (quota is null)
+            return Result<LogResponseDto>.Failure("Aktif paket kotası bulunamadı.");
+
+        var monthlyLogCount = await PackageQuotaHelper.GetMonthlyLogCountAsync(
+            _context,
+            tenantId,
+            cancellationToken);
+
+        if (monthlyLogCount >= quota.MonthlyRequestLimit)
+        {
+            return Result<LogResponseDto>.Failure("Aylık log kotası aşıldı.");
+        }
+
         var log = new SystemLog
         {
-            TenantId = _tenantProvider.TenantId!.Value,
+            TenantId = tenantId,
             ApplicationName = request.ApplicationName.Trim(),
-            LogLevel = NormalizeLogLevel(request.LogLevel),
+            LogLevel = normalizedLevel,
             Message = request.Message.Trim(),
             Timestamp = DateTime.UtcNow,
             HttpMethod = NormalizeOptional(request.HttpMethod)?.ToUpperInvariant(),

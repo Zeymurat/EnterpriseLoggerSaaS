@@ -1,4 +1,6 @@
 import { getAccessToken } from '@/lib/auth'
+import { recordSessionActivity } from '@/lib/session-activity'
+import { notifyUnauthorizedSession } from '@/lib/unauthorized-session'
 
 export interface ApiResult<T> {
   data: T | null
@@ -50,12 +52,31 @@ export interface PlatformTenantListItem {
   createdAt: string
   userCount: number
   logCount: number
+  rootEmail: string | null
+  rootPhone: string | null
   currentPackageName: string | null
   currentSubscriptionStatus: SubscriptionStatusValue | null
+  currentSubscriptionStartDate: string | null
+}
+
+export interface PlatformTenantListFilters {
+  name?: string
+  rootEmail?: string
+  rootPhone?: string
+  packageCode?: string
+  isActive?: boolean
+  subscriptionStartFrom?: string
+  subscriptionStartTo?: string
 }
 
 export interface PlatformTenantListResponse {
   tenants: PlatformTenantListItem[]
+}
+
+export interface PlatformTenantRootUser {
+  id: number
+  email: string
+  phone: string
 }
 
 export interface PlatformSubscription {
@@ -72,6 +93,10 @@ export interface PlatformSubscription {
   autoRenew: boolean
   maxLogsPerMinute: number
   monthlyRequestLimit: number
+  paymentId: number | null
+  paymentReferenceNumber: string | null
+  cancelledAt: string | null
+  cancellationReason: string | null
 }
 
 export interface PlatformTenantDetail {
@@ -81,8 +106,11 @@ export interface PlatformTenantDetail {
   createdAt: string
   userCount: number
   logCount: number
+  rootUser: PlatformTenantRootUser | null
   currentSubscription: PlatformSubscription | null
   subscriptionHistory: PlatformSubscription[]
+  canDelete: boolean
+  deleteBlockedReason: string | null
 }
 
 export interface PlatformPackage {
@@ -103,6 +131,61 @@ export interface PlatformPackage {
   isDefault: boolean
   isAvailable: boolean
   sortOrder: number
+  activeTenantCount: number
+}
+
+export interface PlatformPackageFormData {
+  code: string
+  name: string
+  description: string
+  allowedLogLevels: string
+  isMailEnabled: boolean
+  isSmsEnabled: boolean
+  monthlyRequestLimit: number
+  maxLogsPerMinute: number
+  storageRetentionDays: number
+  priceMonthly: number
+  priceQuarterly: number
+  priceSemiAnnual: number
+  priceAnnual: number
+  isAvailable: boolean
+  sortOrder: number
+}
+
+export const PACKAGE_LOG_LEVEL_OPTIONS = [
+  { value: 'INFO', label: 'Info' },
+  { value: 'WARNING', label: 'Warning' },
+  { value: 'ERROR', label: 'Error' },
+] as const
+
+export type PackageLogLevelValue = (typeof PACKAGE_LOG_LEVEL_OPTIONS)[number]['value']
+
+function isPackageLogLevel(level: string): level is PackageLogLevelValue {
+  return PACKAGE_LOG_LEVEL_OPTIONS.some((option) => option.value === level)
+}
+
+export function parsePackageLogLevels(value: string): PackageLogLevelValue[] {
+  return value
+    .split(',')
+    .map((level) => level.trim().toUpperCase())
+    .filter(isPackageLogLevel)
+}
+
+export function serializePackageLogLevels(levels: string[]): string {
+  const order: PackageLogLevelValue[] = ['INFO', 'WARNING', 'ERROR']
+  return [...new Set(levels.map((level) => level.trim().toUpperCase()))]
+    .filter(isPackageLogLevel)
+    .sort((left, right) => order.indexOf(left) - order.indexOf(right))
+    .join(',')
+}
+
+export function formatPackageLogLevels(value: string): string {
+  const labels = new Map<string, string>(
+    PACKAGE_LOG_LEVEL_OPTIONS.map((option) => [option.value, option.label]),
+  )
+  return parsePackageLogLevels(value)
+    .map((level) => labels.get(level) ?? level)
+    .join(', ')
 }
 
 export interface PlatformPackageListResponse {
@@ -115,25 +198,57 @@ export interface AssignTenantSubscriptionRequest {
   autoRenew: boolean
   isPaid: boolean
   gracePeriodEndDate?: string | null
+  paymentId?: number | null
 }
 
-export interface TenantPanelSession {
-  accessToken: string
-  expiresIn: number
-  user: {
-    id: number
-    email: string
-    phone: string
-    role: string
-    tenantId: number
-    tenantName: string
-    permissions: string[]
-  }
+export const PaymentStatus = {
+  Pending: 0,
+  Confirmed: 1,
+  Rejected: 2,
+} as const
+
+export type PaymentStatusValue = (typeof PaymentStatus)[keyof typeof PaymentStatus]
+
+export interface PlatformPayment {
+  id: number
+  tenantId: number
+  tenantName: string
+  packageId: number
+  packageName: string
+  amount: number
+  currency: string
+  method: string
+  referenceNumber: string
+  status: PaymentStatusValue
+  billingCycle: BillingCycleValue
+  periodStart: string
+  periodEnd: string
+  notes: string
+  createdAt: string
+  confirmedAt: string | null
+  linkedSubscriptionId: number | null
+}
+
+export interface PlatformPaymentListResponse {
+  payments: PlatformPayment[]
+}
+
+export interface RecordPlatformPaymentRequest {
+  tenantId: number
+  packageId: number
+  billingCycle: BillingCycleValue
+  amount: number
+  referenceNumber: string
+  periodStart: string
+  notes?: string
+}
+
+export interface ImpersonateTenantTicket {
+  ticket: string
+  expiresInSeconds: number
 }
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:5247'
-
-const TENANT_PANEL_URL = import.meta.env.VITE_TENANT_PANEL_URL ?? 'http://localhost:5173'
 
 export const NETWORK_ERROR_MESSAGE =
   'Sunucuya ulaşılamadı. Lütfen az sonra tekrar deneyin.'
@@ -166,10 +281,24 @@ async function parseResult<T>(response: Response): Promise<T> {
   return body.data as T
 }
 
-function authHeaders(): HeadersInit {
+async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const token = getAccessToken()
-  if (!token) throw new ApiError('Oturum gerekli.', 401)
-  return { Authorization: `Bearer ${token}` }
+  if (!token) {
+    notifyUnauthorizedSession()
+    throw new ApiError('Oturum gerekli.', 401)
+  }
+
+  const headers = new Headers(options.headers)
+  headers.set('Authorization', `Bearer ${token}`)
+  if (!headers.has('Content-Type') && options.body) {
+    headers.set('Content-Type', 'application/json')
+  }
+
+  const response = await apiFetch(url, { ...options, headers })
+  if (response.status === 401) notifyUnauthorizedSession()
+  else if (response.ok) recordSessionActivity()
+
+  return response
 }
 
 export function isUnauthorizedError(error: unknown): boolean {
@@ -208,6 +337,20 @@ export function billingCycleLabel(cycle: BillingCycleValue): string {
   }
 }
 
+export function packagePriceForCycle(pkg: PlatformPackage, cycle: BillingCycleValue): number {
+  switch (cycle) {
+    case BillingCycle.Annual:
+      return pkg.priceAnnual
+    case BillingCycle.SemiAnnual:
+      return pkg.priceSemiAnnual
+    case BillingCycle.Quarterly:
+      return pkg.priceQuarterly
+    case BillingCycle.Monthly:
+    default:
+      return pkg.priceMonthly
+  }
+}
+
 export async function platformLogin(
   request: PlatformLoginRequest,
 ): Promise<PlatformLoginResponse> {
@@ -220,42 +363,106 @@ export async function platformLogin(
   return parseResult<PlatformLoginResponse>(response)
 }
 
-export async function getPlatformTenants(): Promise<PlatformTenantListResponse> {
-  const response = await apiFetch(`${API_URL}/api/platform/tenants`, {
-    headers: authHeaders(),
+export async function platformRefreshSession(): Promise<PlatformLoginResponse> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/auth/refresh`, {
+    method: 'POST',
   })
 
+  return parseResult<PlatformLoginResponse>(response)
+}
+
+export async function getPlatformTenants(
+  filters: PlatformTenantListFilters = {},
+): Promise<PlatformTenantListResponse> {
+  const params = new URLSearchParams()
+
+  if (filters.name?.trim()) params.set('name', filters.name.trim())
+  if (filters.rootEmail?.trim()) params.set('rootEmail', filters.rootEmail.trim())
+  if (filters.rootPhone?.trim()) params.set('rootPhone', filters.rootPhone.trim())
+  if (filters.packageCode?.trim()) params.set('packageCode', filters.packageCode.trim())
+  if (filters.isActive !== undefined) params.set('isActive', String(filters.isActive))
+  if (filters.subscriptionStartFrom) params.set('subscriptionStartFrom', filters.subscriptionStartFrom)
+  if (filters.subscriptionStartTo) params.set('subscriptionStartTo', filters.subscriptionStartTo)
+
+  const query = params.toString()
+  const response = await authenticatedFetch(
+    `${API_URL}/api/platform/tenants${query ? `?${query}` : ''}`,
+  )
+
   return parseResult<PlatformTenantListResponse>(response)
+}
+
+export async function setTenantStatus(tenantId: number, isActive: boolean): Promise<void> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/tenants/${tenantId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isActive }),
+  })
+
+  await parseResult<boolean>(response)
+}
+
+export async function resetTenantRootPassword(
+  tenantId: number,
+): Promise<{ temporaryPassword: string }> {
+  const response = await authenticatedFetch(
+    `${API_URL}/api/platform/tenants/${tenantId}/root-password/reset`,
+    { method: 'POST' },
+  )
+
+  return parseResult<{ temporaryPassword: string }>(response)
 }
 
 export async function getPlatformTenantDetail(
   tenantId: number,
 ): Promise<PlatformTenantDetail> {
-  const response = await apiFetch(`${API_URL}/api/platform/tenants/${tenantId}`, {
-    headers: authHeaders(),
-  })
+  const response = await authenticatedFetch(`${API_URL}/api/platform/tenants/${tenantId}`)
 
   return parseResult<PlatformTenantDetail>(response)
 }
 
 export async function getPlatformPackages(): Promise<PlatformPackageListResponse> {
-  const response = await apiFetch(`${API_URL}/api/platform/packages`, {
-    headers: authHeaders(),
-  })
+  const response = await authenticatedFetch(`${API_URL}/api/platform/packages`)
 
   return parseResult<PlatformPackageListResponse>(response)
+}
+
+export async function createPlatformPackage(
+  request: PlatformPackageFormData,
+): Promise<PlatformPackage> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/packages`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+
+  return parseResult<PlatformPackage>(response)
+}
+
+export async function updatePlatformPackage(
+  packageId: number,
+  request: Omit<PlatformPackageFormData, 'code'>,
+): Promise<PlatformPackage> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/packages/${packageId}`, {
+    method: 'PUT',
+    body: JSON.stringify(request),
+  })
+
+  return parseResult<PlatformPackage>(response)
+}
+
+export async function deletePlatformPackage(packageId: number): Promise<void> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/packages/${packageId}`, {
+    method: 'DELETE',
+  })
+
+  await parseResult<boolean>(response)
 }
 
 export async function assignTenantSubscription(
   tenantId: number,
   request: AssignTenantSubscriptionRequest,
 ): Promise<PlatformSubscription> {
-  const response = await apiFetch(`${API_URL}/api/platform/tenants/${tenantId}/subscription`, {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/tenants/${tenantId}/subscription`, {
     method: 'POST',
-    headers: {
-      ...authHeaders(),
-      'Content-Type': 'application/json',
-    },
     body: JSON.stringify(request),
   })
 
@@ -263,16 +470,157 @@ export async function assignTenantSubscription(
   return data.subscription
 }
 
-export async function impersonateTenant(tenantId: number): Promise<TenantPanelSession> {
-  const response = await apiFetch(`${API_URL}/api/platform/tenants/${tenantId}/impersonate`, {
+export async function linkSubscriptionPayment(
+  tenantId: number,
+  paymentId: number,
+  subscriptionId?: number,
+): Promise<PlatformSubscription> {
+  const response = await authenticatedFetch(
+    `${API_URL}/api/platform/tenants/${tenantId}/subscription/link-payment`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ paymentId, subscriptionId: subscriptionId ?? null }),
+    },
+  )
+
+  const data = await parseResult<{ subscription: PlatformSubscription }>(response)
+  return data.subscription
+}
+
+export async function impersonateTenant(tenantId: number): Promise<ImpersonateTenantTicket> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/tenants/${tenantId}/impersonate`, {
     method: 'POST',
-    headers: authHeaders(),
   })
 
-  return parseResult<TenantPanelSession>(response)
+  return parseResult<ImpersonateTenantTicket>(response)
 }
 
-export function openTenantPanelWithSession(session: TenantPanelSession): void {
-  const payload = encodeURIComponent(btoa(JSON.stringify(session)))
-  window.open(`${TENANT_PANEL_URL}/impersonate?session=${payload}`, '_blank', 'noopener,noreferrer')
+export function paymentStatusLabel(status: PaymentStatusValue): string {
+  switch (status) {
+    case PaymentStatus.Pending:
+      return 'Bekliyor'
+    case PaymentStatus.Confirmed:
+      return 'Onaylandı'
+    case PaymentStatus.Rejected:
+      return 'Reddedildi'
+    default:
+      return 'Bilinmiyor'
+  }
 }
+
+export async function getPlatformPayments(
+  status?: PaymentStatusValue,
+): Promise<PlatformPaymentListResponse> {
+  const query = status !== undefined ? `?status=${status}` : ''
+  const response = await authenticatedFetch(`${API_URL}/api/platform/payments${query}`)
+  return parseResult<PlatformPaymentListResponse>(response)
+}
+
+export async function getTenantAvailablePayments(
+  tenantId: number,
+): Promise<PlatformPaymentListResponse> {
+  const response = await authenticatedFetch(
+    `${API_URL}/api/platform/payments/tenant/${tenantId}/available`,
+  )
+  return parseResult<PlatformPaymentListResponse>(response)
+}
+
+export async function getTenantPayments(tenantId: number): Promise<PlatformPaymentListResponse> {
+  const response = await authenticatedFetch(
+    `${API_URL}/api/platform/payments/tenant/${tenantId}/history`,
+  )
+  return parseResult<PlatformPaymentListResponse>(response)
+}
+
+export async function recordPlatformPayment(
+  request: RecordPlatformPaymentRequest,
+): Promise<PlatformPayment> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/payments`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  })
+  return parseResult<PlatformPayment>(response)
+}
+
+export async function confirmPlatformPayment(paymentId: number): Promise<PlatformPayment> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/payments/${paymentId}/confirm`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  return parseResult<PlatformPayment>(response)
+}
+
+export async function rejectPlatformPayment(paymentId: number): Promise<PlatformPayment> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/payments/${paymentId}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+  return parseResult<PlatformPayment>(response)
+}
+
+export interface UpdatePlatformPaymentRequest {
+  packageId: number
+  billingCycle: BillingCycleValue
+  amount: number
+  referenceNumber: string
+  periodStart: string
+  notes?: string
+}
+
+export async function updatePlatformPayment(
+  paymentId: number,
+  request: UpdatePlatformPaymentRequest,
+): Promise<PlatformPayment> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/payments/${paymentId}`, {
+    method: 'PUT',
+    body: JSON.stringify(request),
+  })
+  return parseResult<PlatformPayment>(response)
+}
+
+export async function deletePlatformPayment(paymentId: number): Promise<void> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/payments/${paymentId}`, {
+    method: 'DELETE',
+  })
+  await parseResult<boolean>(response)
+}
+
+export async function cancelTenantSubscription(
+  tenantId: number,
+  reason: string,
+): Promise<PlatformSubscription> {
+  const response = await authenticatedFetch(
+    `${API_URL}/api/platform/tenants/${tenantId}/subscription/cancel`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    },
+  )
+
+  const data = await parseResult<{ subscription: PlatformSubscription }>(response)
+  return data.subscription
+}
+
+export async function removeTenantSubscription(
+  tenantId: number,
+  subscriptionId: number,
+): Promise<PlatformSubscription | null> {
+  const response = await authenticatedFetch(
+    `${API_URL}/api/platform/tenants/${tenantId}/subscriptions/${subscriptionId}`,
+    {
+      method: 'DELETE',
+    },
+  )
+
+  const data = await parseResult<{ currentSubscription: PlatformSubscription | null }>(response)
+  return data.currentSubscription
+}
+
+export async function deletePlatformTenant(tenantId: number): Promise<void> {
+  const response = await authenticatedFetch(`${API_URL}/api/platform/tenants/${tenantId}`, {
+    method: 'DELETE',
+  })
+  await parseResult<boolean>(response)
+}
+
+export const PAYMENT_GRACE_DAY_OPTIONS = [7, 10, 15, 21, 30] as const

@@ -156,6 +156,75 @@ namespace EnterpriseLogger.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("EnterpriseLogger.Domain.Entities.Payment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("BillingCycle")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("ConfirmedByPlatformAdminId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("Notes")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("PackageId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("PeriodEnd")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("PeriodStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReferenceNumber")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PackageId");
+
+                    b.HasIndex("ReferenceNumber");
+
+                    b.HasIndex("TenantId", "Status", "CreatedAt");
+
+                    b.ToTable("Payments");
+                });
+
             modelBuilder.Entity("EnterpriseLogger.Domain.Entities.Permission", b =>
                 {
                     b.Property<int>("Id")
@@ -369,6 +438,13 @@ namespace EnterpriseLogger.Infrastructure.Migrations
                     b.Property<int>("BillingCycle")
                         .HasColumnType("integer");
 
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -384,6 +460,9 @@ namespace EnterpriseLogger.Infrastructure.Migrations
                     b.Property<int>("PackageId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("PaymentId")
+                        .HasColumnType("integer");
+
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -396,6 +475,10 @@ namespace EnterpriseLogger.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PackageId");
+
+                    b.HasIndex("PaymentId")
+                        .IsUnique()
+                        .HasFilter("\"PaymentId\" IS NOT NULL");
 
                     b.HasIndex("TenantId", "StartDate");
 
@@ -470,6 +553,25 @@ namespace EnterpriseLogger.Infrastructure.Migrations
                     b.ToTable("UserPermissions");
                 });
 
+            modelBuilder.Entity("EnterpriseLogger.Domain.Entities.Payment", b =>
+                {
+                    b.HasOne("EnterpriseLogger.Domain.Entities.Package", "Package")
+                        .WithMany()
+                        .HasForeignKey("PackageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("EnterpriseLogger.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Package");
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("EnterpriseLogger.Domain.Entities.SystemLog", b =>
                 {
                     b.HasOne("EnterpriseLogger.Domain.Entities.Tenant", "Tenant")
@@ -489,6 +591,11 @@ namespace EnterpriseLogger.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("EnterpriseLogger.Domain.Entities.Payment", "Payment")
+                        .WithOne("Subscription")
+                        .HasForeignKey("EnterpriseLogger.Domain.Entities.TenantSubscription", "PaymentId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("EnterpriseLogger.Domain.Entities.Tenant", "Tenant")
                         .WithMany("Subscriptions")
                         .HasForeignKey("TenantId")
@@ -496,6 +603,8 @@ namespace EnterpriseLogger.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Package");
+
+                    b.Navigation("Payment");
 
                     b.Navigation("Tenant");
                 });
@@ -533,6 +642,11 @@ namespace EnterpriseLogger.Infrastructure.Migrations
             modelBuilder.Entity("EnterpriseLogger.Domain.Entities.Package", b =>
                 {
                     b.Navigation("Subscriptions");
+                });
+
+            modelBuilder.Entity("EnterpriseLogger.Domain.Entities.Payment", b =>
+                {
+                    b.Navigation("Subscription");
                 });
 
             modelBuilder.Entity("EnterpriseLogger.Domain.Entities.Permission", b =>

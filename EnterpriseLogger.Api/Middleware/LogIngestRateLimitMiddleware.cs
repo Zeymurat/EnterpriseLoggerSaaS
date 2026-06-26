@@ -1,6 +1,5 @@
 using EnterpriseLogger.Api.Infrastructure;
 using EnterpriseLogger.Application.Common.Interfaces;
-using EnterpriseLogger.Application.Common.Settings;
 
 namespace EnterpriseLogger.Api.Middleware;
 
@@ -18,8 +17,8 @@ public class LogIngestRateLimitMiddleware
     public async Task InvokeAsync(
         HttpContext context,
         ICurrentTenantProvider tenantProvider,
-        IRateLimiter rateLimiter,
-        RateLimitSettings settings)
+        ITenantPackageQuotaProvider quotaProvider,
+        IRateLimiter rateLimiter)
     {
         if (!ShouldRateLimit(context))
         {
@@ -33,10 +32,21 @@ public class LogIngestRateLimitMiddleware
             return;
         }
 
+        var quota = await quotaProvider.GetAsync(
+            tenantProvider.TenantId!.Value,
+            context.RequestAborted);
+
+        if (quota is null)
+        {
+            await _next(context);
+            return;
+        }
+
+        var policy = new RateLimitPolicy(quota.MaxLogsPerMinute, 60);
         var result = await rateLimiter.TryAcquireAsync(
             $"tenant:{tenantProvider.TenantId!.Value}",
             LogIngestBucket,
-            settings.LogIngestPolicy,
+            policy,
             context.RequestAborted);
 
         if (!result.IsAllowed)
@@ -45,7 +55,7 @@ public class LogIngestRateLimitMiddleware
             await ApiProblemDetails.WriteAsync(
                 context,
                 ApiProblemDetails.TooManyRequests(
-                    "Tenant log ingestion limiti aşıldı. Lütfen kısa süre sonra tekrar deneyin."));
+                    "Dakikalık log kotası aşıldı. Lütfen kısa süre sonra tekrar deneyin."));
             return;
         }
 

@@ -20,5 +20,9 @@ public static class PlatformSubscriptionMapper
             subscription.IsPaid,
             subscription.AutoRenew,
             subscription.Package.MaxLogsPerMinute,
-            subscription.Package.MonthlyRequestLimit);
+            subscription.Package.MonthlyRequestLimit,
+            subscription.PaymentId,
+            subscription.Payment?.ReferenceNumber,
+            subscription.CancelledAt,
+            subscription.CancellationReason);
 }

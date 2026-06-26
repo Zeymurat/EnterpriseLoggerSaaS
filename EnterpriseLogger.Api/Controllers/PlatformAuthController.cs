@@ -44,4 +44,18 @@ public class PlatformAuthController : ControllerBase
 
         return Ok(result);
     }
+
+    [Authorize(Policy = AuthPolicies.PlatformAdminOnly)]
+    [HttpPost("refresh")]
+    public async Task<ActionResult<Result<PlatformLoginResponse>>> Refresh(
+        [FromServices] PlatformRefreshSessionCommand refreshCommand,
+        CancellationToken cancellationToken)
+    {
+        var result = await refreshCommand.ExecuteAsync(cancellationToken);
+
+        if (!result.IsSuccess)
+            return Unauthorized(result);
+
+        return Ok(result);
+    }
 }

@@ -18,13 +18,19 @@ public class PlatformPackagesController : ControllerBase
 {
     private readonly GetPlatformPackagesQuery _getPlatformPackagesQuery;
     private readonly UpdatePlatformPackageCommand _updatePlatformPackageCommand;
+    private readonly CreatePlatformPackageCommand _createPlatformPackageCommand;
+    private readonly DeletePlatformPackageCommand _deletePlatformPackageCommand;
 
     public PlatformPackagesController(
         GetPlatformPackagesQuery getPlatformPackagesQuery,
-        UpdatePlatformPackageCommand updatePlatformPackageCommand)
+        UpdatePlatformPackageCommand updatePlatformPackageCommand,
+        CreatePlatformPackageCommand createPlatformPackageCommand,
+        DeletePlatformPackageCommand deletePlatformPackageCommand)
     {
         _getPlatformPackagesQuery = getPlatformPackagesQuery;
         _updatePlatformPackageCommand = updatePlatformPackageCommand;
+        _createPlatformPackageCommand = createPlatformPackageCommand;
+        _deletePlatformPackageCommand = deletePlatformPackageCommand;
     }
 
     [HttpGet]
@@ -35,6 +41,19 @@ public class PlatformPackagesController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost]
+    public async Task<ActionResult<Result<PlatformPackageDto>>> Create(
+        [FromBody] CreatePlatformPackageRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _createPlatformPackageCommand.ExecuteAsync(request, cancellationToken);
+
+        if (!result.IsSuccess)
+            return BadRequest(result);
+
+        return Ok(result);
+    }
+
     [HttpPut("{id:int}")]
     public async Task<ActionResult<Result<PlatformPackageDto>>> Update(
         int id,
@@ -42,6 +61,22 @@ public class PlatformPackagesController : ControllerBase
         CancellationToken cancellationToken)
     {
         var result = await _updatePlatformPackageCommand.ExecuteAsync(id, request, cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            if (result.ErrorKind == ResultErrorKind.NotFound)
+                return NotFound(result);
+
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<ActionResult<Result<bool>>> Delete(int id, CancellationToken cancellationToken)
+    {
+        var result = await _deletePlatformPackageCommand.ExecuteAsync(id, cancellationToken);
 
         if (!result.IsSuccess)
         {

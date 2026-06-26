@@ -50,7 +50,7 @@ export function Dialog({
     >
       <div
         className={cn(
-          'relative overflow-hidden rounded-2xl border border-white/70 bg-background/90 shadow-2xl animate-in zoom-in-95',
+          'relative flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-2xl border border-white/70 bg-background/90 shadow-2xl animate-in zoom-in-95',
           className,
         )}
         onClick={(e) => e.stopPropagation()}
@@ -58,7 +58,7 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby="dialog-title"
       >
-        <div className="flex items-start justify-between gap-4 border-b bg-muted/30 px-6 py-5">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b bg-muted/30 px-6 py-5">
           <div className="min-w-0">
             <h2 id="dialog-title" className="text-lg font-semibold tracking-tight">
               {title}
@@ -77,8 +77,8 @@ export function Dialog({
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <div className="overflow-y-auto px-6 py-5">{children}</div>
-        {footer && <div className="border-t bg-muted/20 px-6 py-4">{footer}</div>}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        {footer && <div className="shrink-0 border-t bg-muted/20 px-6 py-4">{footer}</div>}
       </div>
     </div>,
     document.body,

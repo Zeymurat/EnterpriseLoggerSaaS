@@ -2,7 +2,7 @@ namespace EnterpriseLogger.Application.Features.Platform.Packages.Dtos;
 
 public static class PlatformPackageMapper
 {
-    public static PlatformPackageDto ToDto(Domain.Entities.Package package) =>
+    public static PlatformPackageDto ToDto(Domain.Entities.Package package, int activeTenantCount = 0) =>
         new(
             package.Id,
             package.Code,
@@ -20,5 +20,6 @@ public static class PlatformPackageMapper
             package.PriceAnnual,
             package.IsDefault,
             package.IsAvailable,
-            package.SortOrder);
+            package.SortOrder,
+            activeTenantCount);
 }

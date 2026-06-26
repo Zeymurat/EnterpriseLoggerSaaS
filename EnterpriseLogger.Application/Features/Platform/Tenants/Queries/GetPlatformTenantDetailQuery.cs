@@ -1,7 +1,9 @@
 using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Common.Subscriptions;
+using EnterpriseLogger.Application.Features.Platform.Tenants;
 using EnterpriseLogger.Application.Features.Platform.Tenants.Dtos;
+using EnterpriseLogger.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace EnterpriseLogger.Application.Features.Platform.Tenants.Queries;
@@ -40,9 +42,18 @@ public class GetPlatformTenantDetailQuery
             .AsNoTracking()
             .CountAsync(log => log.TenantId == tenantId, cancellationToken);
 
+        var rootUser = await _context.Users
+            .AsNoTracking()
+            .Where(u => u.TenantId == tenantId && u.Role == TenantUserRole.Root)
+            .OrderByDescending(u => u.IsActive)
+            .ThenBy(u => u.Id)
+            .Select(u => new PlatformTenantRootUserDto(u.Id, u.Email, u.Phone))
+            .FirstOrDefaultAsync(cancellationToken);
+
         var history = await _context.TenantSubscriptions
             .AsNoTracking()
             .Include(s => s.Package)
+            .Include(s => s.Payment)
             .Where(s => s.TenantId == tenantId)
             .OrderByDescending(s => s.StartDate)
             .ToListAsync(cancellationToken);
@@ -55,6 +66,11 @@ public class GetPlatformTenantDetailQuery
         var historyDtos = history.Select(PlatformSubscriptionMapper.ToDto).ToList();
         var currentDto = current is null ? null : PlatformSubscriptionMapper.ToDto(current);
 
+        var (canDelete, deleteBlockedReason) = await TenantDeletePolicy.EvaluateAsync(
+            _context,
+            tenantId,
+            cancellationToken);
+
         var detail = new PlatformTenantDetailDto(
             tenant.Id,
             tenant.Name,
@@ -62,8 +78,11 @@ public class GetPlatformTenantDetailQuery
             tenant.CreatedAt,
             tenant.UserCount,
             logCount,
+            rootUser,
             currentDto,
-            historyDtos);
+            historyDtos,
+            canDelete,
+            deleteBlockedReason);
 
         return Result<PlatformTenantDetailDto>.Success(detail);
     }

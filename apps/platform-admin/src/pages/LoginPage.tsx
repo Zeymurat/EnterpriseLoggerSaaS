@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { ApiError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -8,10 +8,14 @@ import { Label } from '@/components/ui/label'
 
 export function LoginPage() {
   const { isAuthenticated, login } = useAuth()
+  const [searchParams] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  const sessionExpired = searchParams.get('session') === 'expired'
+  const idleLogout = searchParams.get('reason') === 'idle'
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />
@@ -45,6 +49,14 @@ export function LoginPage() {
             Platform yöneticisi hesabınızla giriş yapın.
           </p>
         </div>
+
+        {sessionExpired ? (
+          <p className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-100">
+            {idleLogout
+              ? 'Hareketsizlik nedeniyle oturumunuz sonlandı. Lütfen tekrar giriş yapın.'
+              : 'Oturumunuz sona erdi. Lütfen tekrar giriş yapın.'}
+          </p>
+        ) : null}
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-2">

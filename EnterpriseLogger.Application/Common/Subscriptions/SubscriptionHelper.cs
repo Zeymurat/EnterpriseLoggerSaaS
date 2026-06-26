@@ -6,7 +6,7 @@ namespace EnterpriseLogger.Application.Common.Subscriptions;
 
 public static class SubscriptionHelper
 {
-  private static readonly SubscriptionStatus[] ActiveStatuses =
+  public static readonly SubscriptionStatus[] ActiveStatuses =
   [
       SubscriptionStatus.Active,
       SubscriptionStatus.PendingPayment,
@@ -23,6 +23,7 @@ public static class SubscriptionHelper
       return await subscriptions
           .AsNoTracking()
           .Include(s => s.Package)
+          .Include(s => s.Payment)
           .Where(s => s.TenantId == tenantId
               && ActiveStatuses.Contains(s.Status)
               && s.EndDate > now)

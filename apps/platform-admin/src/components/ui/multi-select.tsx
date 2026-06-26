@@ -81,10 +81,13 @@ export function MultiSelect({
 
   const displayLabel = (() => {
     if (values.length === 0) return placeholder
-    if (values.length === 1) {
-      return options.find((option) => option.value === values[0])?.label ?? values[0]
-    }
-    return `${values.length} seçili`
+
+    const labels = options
+      .filter((option) => values.includes(option.value))
+      .map((option) => option.label)
+
+    if (labels.length > 0) return labels.join(', ')
+    return values.join(', ')
   })()
 
   const menu = open && menuStyle
@@ -96,7 +99,7 @@ export function MultiSelect({
             top: menuStyle.top,
             left: menuStyle.left,
             width: menuStyle.width,
-            zIndex: 80,
+            zIndex: 110,
           }}
           className="max-h-56 overflow-y-auto rounded-xl border border-border/70 bg-popover p-1.5 text-popover-foreground shadow-warm-lg"
         >
