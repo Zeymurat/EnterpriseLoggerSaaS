@@ -183,6 +183,8 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
+await app.ApplyMigrationsAndSeedAsync();
+
 if (isTesting)
 {
     using var scope = app.Services.CreateScope();
@@ -190,14 +192,6 @@ if (isTesting)
     var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
     await DatabaseSeeder.SeedAsync(db);
     await PlatformAdminSeeder.SeedTestingAsync(db, hasher);
-}
-
-if (isDevelopment)
-{
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
-    await PlatformAdminSeeder.SeedDevelopmentAsync(db, hasher);
 }
 
 app.UseExceptionHandler();
@@ -215,6 +209,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<LogIngestRateLimitMiddleware>();
 app.MapControllers();
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 if (isDevelopment || isTesting)
 {

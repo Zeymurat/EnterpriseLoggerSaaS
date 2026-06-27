@@ -1,0 +1,15 @@
+**/.git
+**/.gitignore
+**/.env
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/.vite
+**/*.tsbuildinfo
+**/agent-transcripts
+**/.DS_Store
+**/.idea
+**/.vscode
+**/LOCAL-*-GUIDE.md
+scripts/benchmark/results-*.md

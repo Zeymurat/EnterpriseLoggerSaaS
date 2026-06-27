@@ -1,70 +1,242 @@
 # EnterpriseLogger SaaS
 
-Multi-tenant enterprise logging platform backend built with **.NET 8**, **Clean Architecture**, **PostgreSQL**, and **Docker**.
+Multi-tenant enterprise logging platform — .NET 8 backend, PostgreSQL, Redis, iki React paneli.
 
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)](https://www.postgresql.org/)
-[![License](https://img.shields.io/badge/license-Private-red)]()
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D)](https://redis.io/)
+[![React](https://img.shields.io/badge/React-18-61DAFB)](https://react.dev/)
 
 ---
 
-## Overview
+## İçindekiler
 
-**EnterpriseLoggerSaaS** lets organizations (tenants) send application logs (Info, Warning, Error) to a centralized API using an **API key**, without running their own ELK/Graylog stack.
+1. [Proje nedir?](#proje-nedir)
+2. [Neden yapıldı?](#neden-yapıldı)
+3. [Teknik kazanımlar](#teknik-kazanımlar)
+4. [Performans](#performans)
+5. [Güvenlik](#güvenlik)
+6. [Teknoloji yığını](#teknoloji-yığını)
+7. [Mimari](#mimari)
+8. [Hızlı başlangıç — Docker](#hızlı-başlangıç--docker)
+9. [Geliştirici kurulumu (isteğe bağlı)](#geliştirici-kurulumu-isteğe-bağlı)
+10. [Uygulama adresleri](#uygulama-adresleri)
+11. [CI/CD](#cicd)
 
-| Goal | Approach |
+---
+
+## Proje nedir?
+
+**EnterpriseLogger SaaS**, kurumların uygulama loglarını (Info, Warning, Error) merkezi bir API'ye göndermesini sağlayan **çok kiracılı (multi-tenant)** bir SaaS platformudur. Her müşteri (tenant) kendi veritabanı satırlarında izole edilir; makine entegrasyonu **API key**, panel erişimi **JWT** ile yapılır.
+
+Platform operatörleri için ayrı bir **Platform Admin** arayüzü; tenant yöneticileri için **Tenant Panel** vardır. Manuel havale/EFT billing modeli, paket kotası, abonelik yenileme ve denetim kaydı desteklenir.
+
+---
+
+## Neden yapıldı?
+
+Bu proje üç amaçla geliştirildi:
+
+1. **CV / portfolyo** — Gerçek bir SaaS ürün iskeleti: multi-tenant, billing, güvenlik, test, CI, Docker.
+2. **.NET öğrenimi** — Django deneyiminden .NET ekosistemine geçiş: Clean Architecture, EF Core, DI, middleware, background services.
+3. **Üretim kalitesi pratiği** — Rate limit, audit log, integration test, Problem Details, migration otomasyonu.
+
+---
+
+## Teknik kazanımlar
+
+### Distributed Multi-Tenant Architecture
+
+Kiracı verileri PostgreSQL'de **EF Core Global Query Filter** ile satır düzeyinde izole edildi. `TenantId` çözülmeden log sorgusu sıfır satır döner; platform admin sorguları kontrollü `IgnoreQueryFilters()` kullanır. API key hash'lenerek saklanır; tenant başına tek Root kullanıcı kuralı veritabanı indeksi ile zorlanır.
+
+**Elde edilen:** Veri sızıntısı riskinin minimize edildiği, paylaşımlı veritabanında tenant izolasyonu.
+
+### High-Throughput Rate Limiting & Quota Management
+
+Redis tabanlı **dakikalık burst** (`MaxLogsPerMinute`, paket bazlı) ve **aylık toplam log kotası** (`MonthlyRequestLimit`, `CreateLogCommand` içinde) motoru kurgulandı. Her tenant kendi paket kotasına tabidir.
+
+**Elde edilen:** Adil kaynak paylaşımı, noisy-neighbor önleme, `429` + `Retry-After` ile öngörülebilir limit davranışı.
+
+### Katmanlı Güvenlik & SecOps
+
+Brute-force ve kimlik avına karşı **e-posta + IP tabanlı account lockout**, **exponential backoff**, **IP-scoped public endpoint rate limit** (login, kayıt), **X-Forwarded-For** spoofing koruması (`TRUST_FORWARDED_HEADERS` yalnızca güvenilir proxy arkasında). JWT oturum tavanı (`JWT_MAX_SESSION_HOURS`), ayrı platform admin JWT'si, RBAC permission kodları.
+
+**Elde edilen:** Auth katmanında savunma derinliği; production'da Problem Details ile stack trace sızıntısı yok.
+
+### Automated Billing Engine
+
+Banka havalesi / EFT modeline uygun: **7 günlük grace period**, otomatik dönem yenileme (`SubscriptionRenewalHostedService`), ödeme yapılmazsa **Free pakete düşürme**, platform admin ödeme onay/red akışı, tenant billing overview sayfası.
+
+**Elde edilen:** Manuel faturalama operasyonları için uçtan uca billing yaşam döngüsü.
+
+### Observability & Operations
+
+Platform **dashboard** (KPI), **renewals** görünümü, **audit log** (tüm platform admin mutasyonları), log **retention** job (paket `StorageRetentionDays`), isteğe bağlı **SMTP bildirimleri** (ödeme, grace, kota uyarısı).
+
+**Elde edilen:** Operasyonel görünürlük ve denetlenebilirlik.
+
+### Enterprise-Grade Testing
+
+**xUnit** + **WebApplicationFactory** ile **110+** unit ve integration test; GitHub Actions CI (`dotnet test`, her iki frontend `npm run build`).
+
+**Elde edilen:** Regresyon koruması, merge öncesi otomatik doğrulama.
+
+---
+
+## Performans
+
+| Konu | Yaklaşım |
 |------|----------|
-| Tenant isolation | Shared database, row-level `TenantId` + EF Core global query filters |
-| Machine auth | `X-Api-Key` header (server-generated at tenant registration) |
-| Secure configuration | Secrets in `.env` (local) / environment variables (production) |
-| Maintainable features | Vertical slices under `Application/Features/` |
-| Quality | xUnit unit + integration tests, conventional commits |
+| Log ingest | Redis fixed-window rate limit; paket `MaxLogsPerMinute` |
+| Sorgular | EF Core indeksler (`TenantId`, `LogLevel`, `Timestamp`, `CorrelationId`) |
+| Liste API'leri | Sunucu tarafı sayfalama, filtreler, CSV export |
+| Log retention | Günlük batch delete; paket saklama süresine göre |
+| Frontend | Vite production build, nginx gzip, TanStack Query cache |
+| Benchmark | `scripts/benchmark/` — ingest/load senaryoları |
 
 ---
 
-## Architecture
+## Güvenlik
 
-Dependencies point **inward**. Domain has no infrastructure references.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  EnterpriseLogger.Api          (HTTP, Swagger, DI root) │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────┐
-│  EnterpriseLogger.Infrastructure  (EF Core, PostgreSQL) │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────┐
-│  EnterpriseLogger.Application   (use cases, validation) │
-└───────────────────────────┬─────────────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────┐
-│  EnterpriseLogger.Domain          (entities, rules)     │
-└─────────────────────────────────────────────────────────┘
-```
-
-| Layer | Responsibility |
-|-------|----------------|
-| **Domain** | `Tenant`, `SystemLog`, `Package`, `TenantSubscription` |
-| **Application** | `IApplicationDbContext`, `Result<T>`, FluentValidation, tenant registration |
-| **Infrastructure** | `ApplicationDbContext`, EF migrations, design-time factory |
-| **Api** | REST controllers, middleware, global exception handler, composition root (`Program.cs`) |
+| Katman | Detay |
+|--------|--------|
+| Tenant izolasyonu | Global query filter + API key / JWT tenant claim |
+| Kimlik doğrulama | Dual-auth (JWT + `X-Api-Key`), ayrı platform admin JWT |
+| Yetkilendirme | Root / Admin / User + granular permission codes |
+| Login koruması | Redis lockout, backoff, IP rate limit |
+| API key | SHA-256 hash, rotate endpoint, tek seferlik gösterim |
+| Hata yanıtları | RFC 7807 Problem Details; prod'da exception detayı yok |
+| Audit | Platform admin işlem logu (impersonate, ödeme, tenant silme vb.) |
+| CORS | Explicit origin listesi |
+| Proxy | Forwarded header trust flag |
 
 ---
 
-## Tech stack
+## Teknoloji yığını
 
-| Area | Choice |
-|------|--------|
-| Runtime | .NET 8 |
-| API | ASP.NET Core Web API + Swagger (Development only) |
-| Database | PostgreSQL 16 (Docker) |
-| ORM | Entity Framework Core 8 (code-first) |
-| Validation | FluentValidation 12 |
-| Cache | Redis 7 — tenant-scoped `POST /api/logs` rate limiting |
-| Tests | xUnit, Moq, `WebApplicationFactory` integration tests |
-| Local secrets | DotNetEnv + `.env` |
+| Alan | Teknoloji | Sürüm |
+|------|-----------|-------|
+| Runtime | .NET | 8.0 |
+| API | ASP.NET Core Web API | 8.0 |
+| ORM | Entity Framework Core | 8.0.11 |
+| Veritabanı | PostgreSQL | 16 (Alpine) |
+| Cache / limit | Redis | 7 (Alpine) |
+| Validation | FluentValidation | 12.x |
+| Auth | JWT Bearer + custom API key handler | — |
+| Frontend | React + Vite + TypeScript | 18 / 5.4 |
+| UI | Tailwind CSS, shadcn/ui pattern | 3.4 |
+| State | TanStack Query | 5.x |
+| Test | xUnit, WebApplicationFactory, Moq | — |
+| Container | Docker, Docker Compose | — |
+| CI | GitHub Actions | — |
+| Reverse proxy (FE) | nginx | 1.27 Alpine |
+
+---
+
+## Mimari
+
+Bağımlılıklar **içe** doğru (Clean Architecture):
+
+```
+EnterpriseLogger.Api          → HTTP, middleware, DI root, Swagger (Dev)
+EnterpriseLogger.Infrastructure → EF Core, Redis, SMTP, background processors
+EnterpriseLogger.Application  → Commands/Queries, validators, DTOs
+EnterpriseLogger.Domain       → Entities, enums (sıfır altyapı bağımlılığı)
+```
+
+**Django karşılığı (özet):** `models.py` → Domain; `views` + services → Application Commands; `urls.py` → Controllers; `migrate` → EF migrations; Celery → `BackgroundService`.
+
+---
+
+## Hızlı başlangıç — Docker
+
+Tam yığın: PostgreSQL + Redis + API + Tenant Panel + Platform Admin.
+
+### Ön koşullar
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) veya Docker Engine + Compose v2
+- Git
+
+### Adımlar
+
+```bash
+# 1. Repoyu klonla
+git clone https://github.com/Zeymurat/EnterpriseLoggerSaaS.git
+cd EnterpriseLoggerSaaS
+
+# 2. Ortam dosyasını oluştur
+cp .env.example .env
+
+# 3. .env içinde en az şunları düzenle:
+#    POSTGRES_PASSWORD=...
+#    JWT_SECRET=...          (min 32 karakter)
+#    PLATFORM_ADMIN_EMAIL=...
+#    PLATFORM_ADMIN_PASSWORD=...  (min 12 karakter)
+
+# 4. Tüm servisleri derle ve başlat (ilk sefer 5–10 dk sürebilir)
+docker compose up -d --build
+
+# 5. Durumu kontrol et
+docker compose ps
+curl http://localhost:5247/health
+```
+
+API ilk açılışta **migration** uygular ve boşsa **platform admin** + paket seed verilerini yükler.
+
+### Durdurma
+
+```bash
+docker compose down          # veriler volume'da kalır
+docker compose down -v       # postgres/redis volume'larını da siler
+```
+
+### Sorun giderme
+
+| Belirti | Çözüm |
+|---------|--------|
+| API `connection refused` | `docker compose logs enterprise-api` — postgres healthy mi? |
+| Panel API'ye ulaşamıyor | `.env` içinde `CORS_ALLOWED_ORIGINS` = `http://localhost:5173,http://localhost:5174` |
+| Platform admin giriş yok | `PLATFORM_ADMIN_EMAIL` / `PASSWORD` `.env`'de dolu mu? DB boşsa seed bir kez çalışır |
+| Port çakışması | `docker-compose.yml` portlarını değiştir; frontends'i yeniden build et (`VITE_API_URL`) |
+
+---
+
+## Geliştirici kurulumu (isteğe bağlı)
+
+Terminalden ayrı ayrı çalıştırmak için:
+
+```bash
+docker compose up -d enterprise-postgres enterprise-redis
+cp .env.example .env   # localhost connection strings
+dotnet run --project EnterpriseLogger.Api
+
+cd apps/tenant-panel && cp .env.example .env && npm ci && npm run dev
+cd apps/platform-admin && cp .env.example .env && npm ci && npm run dev
+```
+
+Migration **Development** ortamında API başlarken otomatik uygulanır.
+
+---
+
+## Uygulama adresleri
+
+| Servis | URL | Açıklama |
+|--------|-----|----------|
+| Tenant Panel | http://localhost:5173 | Tenant admin / kullanıcı paneli |
+| Platform Admin | http://localhost:5174 | Operatör: müşteri, paket, ödeme |
+| API | http://localhost:5247 | REST API |
+| Swagger | http://localhost:5247/swagger | Yalnızca Development |
+| Health | http://localhost:5247/health | Docker / load balancer probe |
+
+---
+
+## CI/CD
+
+`.github/workflows/ci.yml` — her `main` push/PR:
+
+- `dotnet test` (Release)
+- `apps/tenant-panel` → `npm ci && npm run build`
+- `apps/platform-admin` → `npm ci && npm run build`
 
 ---
 
@@ -72,451 +244,25 @@ Dependencies point **inward**. Domain has no infrastructure references.
 
 ```
 EnterpriseLoggerSaaS/
-├── .env.example              # Template for local secrets (copy → .env)
-├── docker-compose.yml        # PostgreSQL + Redis
-├── EnterpriseLogger.sln
-├── EnterpriseLogger.Domain/
+├── docker-compose.yml          # Tam yığın (DB, Redis, API, 2 FE)
+├── .env.example
+├── EnterpriseLogger.Api/       # Dockerfile, Controllers, Middleware
 ├── EnterpriseLogger.Application/
-│   ├── Common/Interfaces/    # IApplicationDbContext, ICurrentTenantProvider
-│   ├── Common/Models/        # Result<T>
-│   └── Features/             # Tenants, Logs (commands & queries)
+├── EnterpriseLogger.Domain/
 ├── EnterpriseLogger.Infrastructure/
-│   ├── Persistence/          # DbContext, migrations, query filters
-│   └── RateLimiting/         # Redis + in-memory rate limiter
-├── EnterpriseLogger.Api/
-│   ├── Controllers/          # TenantsController, LogsController
-│   ├── Middleware/           # LogIngestRateLimitMiddleware
-│   └── Infrastructure/       # GlobalExceptionHandler, ApiProblemDetails
-├── EnterpriseLogger.Application.Tests/
-├── EnterpriseLogger.Api.IntegrationTests/
-└── apps/
-    ├── tenant-panel/         # React SPA — tenant users (Vite, port 5173)
-    └── platform-admin/       # React SPA — platform operators (Vite, port 5174)
+├── EnterpriseLogger.*.Tests/
+├── apps/tenant-panel/          # Dockerfile + nginx
+└── apps/platform-admin/
 ```
-
----
-
-## Prerequisites
-
-- [.NET 8 SDK](https://dotnet.microsoft.com/download)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- Git
-
-Optional: [EF Core CLI](https://learn.microsoft.com/en-us/ef/core/cli/dotnet)
-
-```bash
-dotnet tool install --global dotnet-ef
-```
-
----
-
-## Quick start
-
-### 1. Clone and configure secrets
-
-```bash
-git clone https://github.com/Zeymurat/EnterpriseLoggerSaaS.git
-cd EnterpriseLoggerSaaS
-cp .env.example .env
-```
-
-Edit `.env` for **local** development (example):
-
-```env
-POSTGRES_USER=saas_admin
-POSTGRES_PASSWORD=<your-password>
-POSTGRES_DB=EnterpriseLoggerDb
-DB_CONNECTION_STRING=Host=localhost;Port=5432;Database=EnterpriseLoggerDb;Username=saas_admin;Password=<your-password>
-REDIS_CONNECTION_STRING=localhost:6379
-LOG_INGEST_RATE_LIMIT_PER_MINUTE=1000
-LOG_INGEST_RATE_LIMIT_WINDOW_SECONDS=60
-```
-
-> `.env` is gitignored. Never commit passwords.
-
-### 2. Start infrastructure
-
-```bash
-docker compose up -d
-```
-
-### 3. Apply database migrations
-
-```bash
-dotnet ef database update \
-  --project EnterpriseLogger.Infrastructure \
-  --startup-project EnterpriseLogger.Api
-```
-
-Recent migrations include `AddPlatformAuditAndNotifications` (platform audit log + notification dispatch dedup tables).
-
-### 4. Run the API
-
-```bash
-dotnet run --project EnterpriseLogger.Api
-```
-
-Swagger UI (Development): **http://localhost:5247/swagger**
-
-### 5. Run tenant panel (optional)
-
-```bash
-cd apps/tenant-panel
-cp .env.example .env
-npm install
-npm run dev
-```
-
-Panel: **http://localhost:5173** — requires API running and `CORS_ALLOWED_ORIGINS` including `http://localhost:5173` in root `.env`.
-
-### 6. Run platform admin (optional)
-
-```bash
-cd apps/platform-admin
-cp .env.example .env
-npm install
-npm run dev
-```
-
-Platform admin: **http://localhost:5174** — separate login (`POST /api/platform/auth/login`). On first Development startup, set `PLATFORM_ADMIN_EMAIL` and `PLATFORM_ADMIN_PASSWORD` in root `.env`; the API seeds the first platform admin if the table is empty.
-
-### 7. Run tests
-
-```bash
-dotnet test
-```
-
----
-
-## API (current)
-
-| Method | Route | Auth | Description |
-|--------|-------|------|-------------|
-| `POST` | `/api/tenants` | — | Register a new tenant |
-| `POST` | `/api/tenants/me/api-key/rotate` | Bearer JWT (Root, `apikeys:rotate`) | Generate or rotate tenant API key (shown once) |
-| `POST` | `/api/auth/login` | — | Panel login (email + password → JWT) |
-| `POST` | `/api/platform/auth/login` | — | Platform admin login (separate JWT, no `tenantId`) |
-| `GET` | `/api/platform/tenants` | Bearer JWT (`platform_admin=true`) | List tenants (paginated; filters, sort, CSV export) |
-| `GET` | `/api/platform/tenants/export` | Bearer JWT (`platform_admin=true`) | Export filtered tenant list as CSV |
-| `GET` | `/api/platform/tenants/{id}` | Bearer JWT (`platform_admin=true`) | Tenant detail + subscription history |
-| `POST` | `/api/platform/tenants/{id}/subscription` | Bearer JWT (`platform_admin=true`) | Assign or change tenant package (closes previous subscription) |
-| `POST` | `/api/platform/tenants/{id}/impersonate` | Bearer JWT (`platform_admin=true`) | Issue login-as ticket for tenant panel |
-| `GET` | `/api/platform/packages` | Bearer JWT (`platform_admin=true`) | List subscription packages |
-| `POST` | `/api/platform/packages` | Bearer JWT (`platform_admin=true`) | Create package |
-| `PUT` | `/api/platform/packages/{id}` | Bearer JWT (`platform_admin=true`) | Update package quotas and pricing |
-| `DELETE` | `/api/platform/packages/{id}` | Bearer JWT (`platform_admin=true`) | Delete package (if no subscriptions/payments) |
-| `GET` | `/api/platform/payments` | Bearer JWT (`platform_admin=true`) | List payments (filter by status) |
-| `GET` | `/api/platform/dashboard` | Bearer JWT (`platform_admin=true`) | Platform KPIs (tenants, payments, renewals, quota) |
-| `GET` | `/api/platform/renewals` | Bearer JWT (`platform_admin=true`) | Upcoming / pending / grace-expired subscriptions |
-| `GET` | `/api/platform/audit-logs` | Bearer JWT (`platform_admin=true`) | Platform admin action audit log (paginated) |
-| `GET` | `/api/billing/notice` | Bearer JWT | Tenant billing notice (pending payment banner) |
-| `GET` | `/api/billing/usage` | Bearer JWT | Tenant quota usage (monthly + per-minute) |
-| `GET` | `/api/billing/overview` | Bearer JWT | Tenant subscription summary + recent payments |
-| `POST` | `/api/auth/refresh` | Bearer JWT | Extend panel session (new access token, same `session_started_at` claim) |
-| `GET` | `/api/users` | Bearer JWT | List tenant users (`users:read`) |
-| `POST` | `/api/users/invite` | Bearer JWT | Invite Admin or User (`users:invite`) |
-| `PATCH` | `/api/users/{id}/permissions` | Bearer JWT | Update User role permissions (`users:manage`) |
-| `PATCH` | `/api/users/{id}/role` | Bearer JWT (Root) | Promote User → Admin |
-| `PATCH` | `/api/users/{id}/deactivate` | Bearer JWT | Deactivate user (`users:manage`) |
-| `POST` | `/api/logs` | `X-Api-Key` **or** `Bearer JWT` | Ingest a log entry (`Info`, `Warning`, `Error`). Tenant rate limit applies — `429` when exceeded |
-| `GET` | `/api/logs` | `X-Api-Key` **or** `Bearer JWT` | List logs for the authenticated tenant (paginated; query: `page`, `pageSize`, `logLevel`, `search`, `from`, `to`, `applicationName`) |
-
-### Register tenant
-
-**Request body**
-
-```json
-{
-  "name": "Acme Corp",
-  "ownerEmail": "owner@acme.com",
-  "ownerPhone": "+905551234567",
-  "ownerPassword": "SecurePass123!"
-}
-```
-
-**Success:** `200 OK` with `Result<TenantResponseDto>` — tenant metadata only (`id`, `name`, `ownerEmail`, etc.). **No API key in the response.** A **Root** user is created for the tenant owner. After login, generate the API key from the tenant panel (`POST /api/tenants/me/api-key/rotate`, Root + `apikeys:rotate`).
-
-### Panel login (JWT)
-
-**Request body**
-
-```json
-{
-  "email": "owner@acme.com",
-  "password": "SecurePass123!"
-}
-```
-
-**Success:** `200 OK` with `accessToken`, `expiresIn`, and `user` (role, permissions). Use Swagger **Authorize → Bearer** to paste the token.
-
-### Panel session model (idle + refresh)
-
-The tenant panel uses **three independent timers** — do not confuse them:
-
-| Layer | Config | Default | Meaning |
-|-------|--------|---------|---------|
-| **Access token (JWT)** | `JWT_ACCESS_TOKEN_EXPIRY_MINUTES` (API `.env`) | 60 min | Crypto lifetime of each token. Renewed on login and on **refresh**. |
-| **Absolute max session** | `JWT_MAX_SESSION_HOURS` (API `.env`) | 8 h | Time since **first login** (`session_started_at` claim). After this, `/api/auth/refresh` returns 401 — user must log in again. |
-| **Idle timeout (UX)** | `VITE_SESSION_IDLE_MINUTES` (panel `.env`) | 15 min | No mouse/keyboard/scroll/touch and no successful authenticated API call → warning, then logout. |
-| **Idle warning** | `VITE_SESSION_WARN_MINUTES` (panel `.env`) | 2 min | How long before idle limit the *"Oturumu uzat"* dialog appears. |
-
-**Idle is not “15 minutes since login”.** Live log polling (`GET /api/logs` every 30s), page navigation, and filters all count as activity and reset the idle clock.
-
-**“Oturumu uzat”** calls `POST /api/auth/refresh` → new JWT (another `JWT_ACCESS_TOKEN_EXPIRY_MINUTES` window) while preserving `session_started_at` until `JWT_MAX_SESSION_HOURS` is reached.
-
-**401 handling:** expired or invalid JWT on any authenticated request → panel clears session and redirects to `/login?session=expired`.
-
-If the same email exists in multiple tenants and `tenantName` is omitted, the API returns **400 Bad Request** with `errorCode: "AmbiguousTenantContext"` and `tenantOptions` (tenant name + role per match). The tenant panel shows a picker and retries login with the selected `tenantName`:
-
-```json
-{
-  "data": null,
-  "isSuccess": false,
-  "errorCode": "AmbiguousTenantContext",
-  "errorMessage": "Multiple tenants match this email. Please specify tenantName.",
-  "tenantOptions": [
-    { "tenantName": "zeymurat", "role": "Root", "displayName": null },
-    { "tenantName": "Zeymurat-Global", "role": "User", "displayName": null }
-  ]
-}
-```
-
-Retry with an explicit tenant:
-
-```json
-{
-  "email": "consultant@shared.com",
-  "password": "SecurePass123!",
-  "tenantName": "Acme Corp"
-}
-```
-
-### Log ingestion & query (dual-channel auth)
-
-| Channel | Header | Who | Permission check |
-|---------|--------|-----|------------------|
-| **Machine** | `X-Api-Key` | Customer app / backend | None (tenant scope only) |
-| **Human (panel)** | `Authorization: Bearer <JWT>` | Root / Admin / User | `logs:read` (GET), `logs:write` (POST) |
-
-Send the tenant API key for machine integration, or a JWT from login for the admin panel. In Swagger, use **Authorize** for either `X-Api-Key` or `Bearer`.
-
-**Rate limiting:** `POST /api/logs` is limited **per tenant** by the active package (`MaxLogsPerMinute` via Redis fixed window). Monthly volume is enforced in `CreateLogCommand` (`MonthlyRequestLimit`). `LOG_INGEST_RATE_LIMIT_*` in `.env` are legacy policy defaults only. `POST /api/auth/login` and `POST /api/tenants` are limited per client IP (defaults: **20** and **5** requests / 60 seconds). **Login lockout:** after repeated failed attempts per email or IP, accounts are locked (default **10** email / **30** IP failures → **15 min** lockout) with exponential backoff from the 3rd failure. Exceeding limits returns `429 Too Many Requests` with RFC 7807 Problem Details and a `Retry-After` header. `GET /api/logs` is not rate limited.
-
-### User management (JWT only)
-
-**Invite user** (`POST /api/users/invite`) — response includes `temporaryPassword` (shown once; no email server yet).
-
-```json
-{
-  "email": "dev@acme.com",
-  "phone": "05551234567",
-  "role": "User",
-  "permissions": ["logs:read"]
-}
-```
-
-| Rule | Detail |
-|------|--------|
-| Root | Full tenant control; only Root can invite Admin or change roles |
-| Admin | Can invite Users, manage User permissions, deactivate Users |
-| User | Custom permissions via `UserPermissions` table |
-| Root | Cannot be deactivated or have role changed |
-| Inactive user | Can be re-invited with same email (new `temporaryPassword`, reactivated) |
-| Duplicate email/phone | `409 Conflict` within the same tenant (active users) |
-
-**Permission changes:** After `PATCH /api/users/{id}/permissions`, the affected user must **log in again** to receive a JWT with updated permissions (existing tokens keep old claims until expiry).
-
-**Create log example**
-
-Required fields: `applicationName`, `logLevel`, `message`. Optional request context (sent by the customer app):
-
-```json
-{
-  "applicationName": "BillingService",
-  "logLevel": "Error",
-  "message": "Payment provider timeout after 30s",
-  "httpMethod": "POST",
-  "requestPath": "/api/checkout",
-  "statusCode": 504,
-  "correlationId": "req_8f2a1b",
-  "actorIdentifier": "customer@acme.com",
-  "exceptionType": "TimeoutException"
-}
-```
-
-Context fields are optional — existing integrations that send only the three required fields keep working.
-
-**GET /api/logs** returns a paginated envelope. Each item includes context fields when present.
-
-| Query | Description |
-|-------|-------------|
-| `page` | Page number (default `1`) |
-| `pageSize` | Items per page (default `25`, max `100`) |
-| `logLevels` | `Info`, `Warning`, `Error` (repeat or multi-value) |
-| `search` | Case-insensitive match in **message** |
-| `from` / `to` | UTC timestamp range (inclusive). Supports full ISO datetimes for live windows (e.g. last 10 minutes) |
-| `applicationNames` | One or more exact application names |
-| `httpMethods` | One or more HTTP methods (e.g. `GET`, `POST`) |
-| `statusCodes` | One or more HTTP status codes (e.g. `200`, `404`) |
-| `correlationId` | Exact match on request trace / correlation id |
-
-**GET /api/logs/export** returns a UTF-8 CSV of matching logs (same query params as list, without pagination). Up to **10,000** rows per export; response headers `X-Export-Count`, `X-Export-Total-Matching`, `X-Export-Truncated` indicate how many rows were exported.
-
-```json
-{
-  "data": {
-    "items": [
-      {
-        "id": 42,
-        "applicationName": "BillingService",
-        "logLevel": "Error",
-        "message": "Payment provider timeout after 30s",
-        "timestamp": "2026-06-04T14:30:00Z",
-        "httpMethod": "POST",
-        "requestPath": "/api/checkout",
-        "statusCode": 504
-      }
-    ],
-    "totalCount": 250,
-    "page": 1,
-    "pageSize": 25,
-    "summary": { "total": 250, "info": 116, "warning": 95, "error": 39 },
-    "overallSummary": { "total": 250, "info": 116, "warning": 95, "error": 39 },
-    "isDateFiltered": true
-  },
-  "isSuccess": true,
-  "errorMessage": null
-}
-```
-
-In the tenant panel:
-- **Logs** page supports live time presets (10m / 30m / 1h / 3h / 12h), date presets, CSV export, and auto-refresh on live presets.
-- **Dashboard** uses the same time range selector and summary cards for the selected window.
-- Click a log row to open the **log detail sheet** (request type, URL, status, actor, correlation id, exception type when available).
-- **Empty & error UX:** new tenants with zero logs see an onboarding card (API key + integration docs). Filtered searches with no matches show a clear empty table state. API/network failures surface a reusable error card with retry — network outages map to a friendly *"Sunucuya ulaşılamadı"* message from the shared `apiFetch` layer (no Axios interceptors).
-- **Correlation trace:** log detail sheet → *İlişkili istekleri filtrele* opens `/logs?correlationId=…` and lists the full request chain (`GET /api/logs?correlationId=` exact match).
-- **Billing & quota:** `/billing` shows subscription, grace period, retention, and payment history (`GET /api/billing/overview`). Layout banners show payment notices and quota usage; critical usage (≥90%) is highlighted.
-
-### Platform admin (http://localhost:5174)
-
-| Page | Route | Description |
-|------|-------|-------------|
-| Kontrol Paneli | `/dashboard` | KPIs: tenants, pending payments, renewals, high-quota tenants |
-| Müşteriler | `/customers` | Paginated tenant list, filters, sort, CSV export, tenant sheet |
-| Paketler | `/packages` | Package CRUD, quotas, log levels, pricing |
-| Ödemeler | `/payments` | Manual havale/EFT payment workflow (record, confirm, reject) |
-| Yenilemeler | `/renewals` | Pending payment, upcoming auto-renew, grace-expired subscriptions |
-| Denetim | `/audit-logs` | Platform admin action history (tenant ops, payments, packages, login-as) |
-
-Login-as uses a short-lived ticket → tenant panel `/impersonate` (requires `TENANT_PANEL_URL` / `VITE_TENANT_PANEL_URL`).
-
-### Background jobs (API process)
-
-| Service | Interval | Purpose |
-|---------|----------|---------|
-| `SubscriptionRenewalHostedService` | 1 h | Auto-renew subscriptions, grace expiry → Free downgrade |
-| `BillingNotificationHostedService` | 1 h | E-mail: payment due, grace reminder, quota ≥90% (SMTP + `IsMailEnabled`) |
-| `LogRetentionHostedService` | 24 h | Delete logs older than package `StorageRetentionDays` |
-
-Skipped in `Testing` environment (integration tests). Disabled when `EMAIL_NOTIFICATIONS_ENABLED=false`.
-
-### Error responses
-
-| Situation | Format |
-|-----------|--------|
-| FluentValidation / business rule failure | `400 Bad Request` — `Result<T>` with `isSuccess: false` |
-| Missing or invalid API key | `401 Unauthorized` — RFC 7807 Problem Details |
-| Inactive tenant | `403 Forbidden` — RFC 7807 Problem Details |
-| Log ingestion rate limit exceeded | `429 Too Many Requests` — RFC 7807 Problem Details + `Retry-After` header |
-| Unhandled server error | `500 Internal Server Error` — RFC 7807 Problem Details |
-
-In **Production**, Problem Details responses do **not** include stack traces or `exceptionDetail` (CWE-209 safe). Full exception detail is only attached when `IsDevelopment()` is true.
-
----
-
-## Configuration
-
-| Source | When |
-|--------|------|
-| `.env` (solution root) | Local Development (`DotNetEnv` loads via `EnvFileLoader`) |
-| Environment variables | Production / CI (`DB_CONNECTION_STRING`, `JWT_SECRET`, etc.) |
-| `appsettings.json` | Non-secret defaults only (connection string empty) |
-
-**JWT variables** (see `.env.example`): `JWT_SECRET` (min 32 chars), `JWT_ISSUER`, `JWT_AUDIENCE`, `JWT_ACCESS_TOKEN_EXPIRY_MINUTES`, `JWT_MAX_SESSION_HOURS`.
-
-**Redis & rate limiting** (see `.env.example`): `REDIS_CONNECTION_STRING`; log ingest limits are **package-based** (`MaxLogsPerMinute` / `MonthlyRequestLimit` per tenant); public endpoints (`AUTH_LOGIN_RATE_LIMIT_*`, `TENANT_REGISTER_RATE_LIMIT_*`, per IP); login lockout (`LOGIN_MAX_FAILED_ATTEMPTS_EMAIL`, `LOGIN_MAX_FAILED_ATTEMPTS_IP`, `LOGIN_LOCKOUT_MINUTES`, `LOGIN_BACKOFF_START_AFTER`, etc.). Set `TRUST_FORWARDED_HEADERS=true` only behind a trusted reverse proxy — otherwise clients can spoof `X-Forwarded-For` to bypass IP limits. Integration tests use in-memory implementations (no Redis in CI).
-
-**Billing & subscriptions:** `SUBSCRIPTION_PAYMENT_GRACE_DAYS` (default 7) — days after auto-renew before downgrade to Free when payment is missing.
-
-**E-mail notifications** (optional): set `EMAIL_NOTIFICATIONS_ENABLED=true` and SMTP vars (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_FROM_NAME`, `SMTP_USE_SSL`). Tenant must have an active package with `IsMailEnabled`. Sends: payment due on renewal, grace reminder (3 days before expiry), monthly quota warning (≥90%).
-
-**CORS** (frontends): `CORS_ALLOWED_ORIGINS` — comma-separated origins; default `http://localhost:5173,http://localhost:5174`.
-
-**Login-as:** `TENANT_PANEL_URL` — base URL for platform admin impersonate redirect (default `http://localhost:5173`).
-
-**Frontend** (`apps/tenant-panel/.env`): `VITE_API_URL`, `VITE_SESSION_IDLE_MINUTES`, `VITE_SESSION_WARN_MINUTES` (see `apps/tenant-panel/.env.example`).
-
-**Frontend** (`apps/platform-admin/.env`): `VITE_API_URL`, `VITE_TENANT_PANEL_URL`, `VITE_SESSION_IDLE_MINUTES`, `VITE_SESSION_WARN_MINUTES` (see `apps/platform-admin/.env.example`).
-
----
-
-## Development workflow
-
-1. Create a feature branch from `main`:
-
-   ```bash
-   git checkout main
-   git pull
-   git checkout -b feature/your-feature-name
-   ```
-
-2. Commit with [Conventional Commits](https://www.conventionalcommits.org/):
-
-   ```text
-   feat(tenant): add tenant registration endpoint
-   ```
-
-3. Open a **Pull Request** into `main`. GitHub Actions runs **CI** automatically (`dotnet test` + tenant-panel `npm run build`). Merge after checks pass.
-
-`main` is the stable branch. Solo development may commit directly to `main`; PRs remain optional but useful as a CI checkpoint and history marker.
-
----
-
-## Roadmap
-
-- [x] Global exception handling (RFC 7807 Problem Details)
-- [x] `POST /api/logs` with tenant-scoped ingestion
-- [x] `GET /api/logs` with tenant-scoped query
-- [x] API key authentication (`X-Api-Key` via authentication handler)
-- [x] Integration tests (`WebApplicationFactory`)
-- [x] Global query filters for multi-tenant isolation
-- [x] JWT login endpoint (`POST /api/auth/login`)
-- [x] Dual-auth pipeline (JWT + ApiKey on log endpoints)
-- [x] Tenant user management (invite, permissions, role, deactivate)
-- [x] CORS for frontend clients
-- [x] Tenant panel skeleton (React + Vite + Tailwind)
-- [x] Logs & users UI in tenant panel
-- [x] Log request context fields + log detail sheet (tenant panel)
-- [x] Paginated log listing with filters, live time presets, CSV export (tenant panel)
-- [x] Empty state & error UX (onboarding card, API error card, network fallback)
-- [x] Idle session warning + JWT refresh (`POST /api/auth/refresh`)
-- [x] Redis for rate limits / quotas
-- [x] GitHub Actions CI (`build` + `test`)
-- [x] Platform admin (customers, packages, payments, subscriptions)
-- [x] Package-based per-tenant quotas (monthly + per-minute)
-- [x] Platform dashboard, renewals view, audit log
-- [x] Tenant billing overview page + quota usage warnings
-- [x] Log retention enforcement (package `StorageRetentionDays`)
-- [x] SMTP e-mail notifications (payment due, grace reminder, quota warning)
 
 ---
 
 ## Contributing
 
-This repository is currently **private**. For internal work: branch → PR → merge to `main`.
+Private repo — internal: branch → PR → `main`. Solo geliştirmede doğrudan `main` commit mümkün.
 
 ---
 
 ## Author
 
-**Zeymurat** — Enterprise SaaS learning & production-oriented backend practice.
+**Zeymurat** — Enterprise SaaS, .NET backend pratiği ve multi-tenant platform mühendisliği.

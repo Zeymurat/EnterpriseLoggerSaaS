@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   enterprise-postgres:
     image: postgres:16-alpine
@@ -14,6 +12,12 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-saas_admin} -d ${POSTGRES_DB:-EnterpriseLoggerDb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   enterprise-redis:
     image: redis:7-alpine
@@ -22,6 +26,62 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  enterprise-api:
+    build:
+      context: .
+      dockerfile: EnterpriseLogger.Api/Dockerfile
+    container_name: enterprise-api
+    env_file:
+      - .env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      RUN_DATABASE_MIGRATIONS: "true"
+      DB_CONNECTION_STRING: Host=enterprise-postgres;Port=5432;Database=${POSTGRES_DB:-EnterpriseLoggerDb};Username=${POSTGRES_USER:-saas_admin};Password=${POSTGRES_PASSWORD}
+      REDIS_CONNECTION_STRING: enterprise-redis:6379
+      CORS_ALLOWED_ORIGINS: http://localhost:5173,http://localhost:5174
+      TENANT_PANEL_URL: http://localhost:5173
+    ports:
+      - "5247:8080"
+    depends_on:
+      enterprise-postgres:
+        condition: service_healthy
+      enterprise-redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  tenant-panel:
+    build:
+      context: apps/tenant-panel
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5247
+    container_name: enterprise-tenant-panel
+    ports:
+      - "5173:80"
+    depends_on:
+      - enterprise-api
+    restart: unless-stopped
+
+  platform-admin:
+    build:
+      context: apps/platform-admin
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5247
+        VITE_TENANT_PANEL_URL: http://localhost:5173
+    container_name: enterprise-platform-admin
+    ports:
+      - "5174:80"
+    depends_on:
+      - enterprise-api
+    restart: unless-stopped
 
 volumes:
   postgres_data:
