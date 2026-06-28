@@ -1,7 +1,7 @@
 import { getAccessToken } from '@/lib/auth'
 import { notifyUnauthorizedSession } from '@/lib/unauthorized-session'
 import { recordSessionActivity } from '@/lib/session-activity'
-import type { CreateLogRequest, GetLogsParams, LogEntry, LogFilterOptions, LogListResponse } from '@/types/log-entry'
+import type { CreateLogRequest, GetLogsParams, LogEntry, LogListResponse } from '@/types/log-entry'
 
 export type { CreateLogRequest, GetLogsParams, LogEntry, LogFilterOptions, LogLevelSummary, LogListResponse } from '@/types/log-entry'
 

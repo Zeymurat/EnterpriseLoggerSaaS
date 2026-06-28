@@ -20,12 +20,12 @@ public class PublicEndpointRateLimitTests
             Assert.Equal(HttpStatusCode.Unauthorized, allowed.StatusCode);
         }
 
-        var limited = await PostLoginAsync(client, "user4@test.local");
+        var limited = await PostLoginAsync(client, "user3@test.local");
         Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
         Assert.True(limited.Headers.TryGetValues("Retry-After", out _));
 
         using var doc = await limited.Content.ReadFromJsonAsync<JsonDocument>();
-        Assert.Equal("İstek limiti aşıldı", doc!.RootElement.GetProperty("title").GetString());
+        Assert.Equal("Çok fazla giriş denemesi. Lütfen kısa süre sonra tekrar deneyin.", doc!.RootElement.GetProperty("detail").GetString());
     }
 
     [Fact]
