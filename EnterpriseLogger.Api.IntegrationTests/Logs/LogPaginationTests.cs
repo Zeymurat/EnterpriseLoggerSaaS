@@ -103,32 +103,6 @@ public class LogPaginationTests : IClassFixture<EnterpriseLoggerWebApplicationFa
     }
 
     [Fact]
-    public async Task GetLogFilterOptions_ReturnsDistinctValues()
-    {
-        var apiKey = await IntegrationTestAuth.RegisterLoginAndRotateApiKeyAsync(_client, "Filter Options Corp");
-
-        await IntegrationTestAuth.CreateLogAsync(_client, apiKey, "BillingApi", "Error", "A", httpMethod: "POST", statusCode: 402);
-        await IntegrationTestAuth.CreateLogAsync(_client, apiKey, "AuthApi", "Info", "B", httpMethod: "GET", statusCode: 200);
-
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/logs/filter-options");
-        request.Headers.Add(TenantAuthConstants.ApiKeyHeaderName, apiKey);
-
-        var response = await _client.SendAsync(request);
-        response.EnsureSuccessStatusCode();
-
-        using var doc = await response.Content.ReadFromJsonAsync<JsonDocument>();
-        var data = doc!.RootElement.GetProperty("data");
-
-        var apps = data.GetProperty("applicationNames").EnumerateArray().Select(e => e.GetString()).ToList();
-        Assert.Contains("BillingApi", apps);
-        Assert.Contains("AuthApi", apps);
-
-        var methods = data.GetProperty("httpMethods").EnumerateArray().Select(e => e.GetString()).ToList();
-        Assert.Contains("POST", methods);
-        Assert.Contains("GET", methods);
-    }
-
-    [Fact]
     public async Task GetLogs_WithDateFilter_ReturnsOverallAndFilteredSummaries()
     {
         var apiKey = await IntegrationTestAuth.RegisterLoginAndRotateApiKeyAsync(_client, "Date Summary Corp");

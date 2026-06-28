@@ -51,6 +51,9 @@ public class UpdateUserPermissionsCommand
         if (user.Role != TenantUserRole.User)
             return Result<UserResponseDto>.Failure("İzin güncellemesi yalnızca User rolündeki kullanıcılar için yapılabilir.");
 
+        if (_currentUser.UserId == userId)
+            return Result<UserResponseDto>.Forbidden("Kendi izinlerinizi güncelleyemezsiniz.");
+
         var permissionCodes = request.Permissions.Distinct(StringComparer.Ordinal).ToList();
         var invalidCodes = permissionCodes.Where(c => !PermissionCodes.All.Contains(c)).ToList();
         if (invalidCodes.Count > 0)

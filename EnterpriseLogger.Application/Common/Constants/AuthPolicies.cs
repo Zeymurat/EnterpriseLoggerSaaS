@@ -9,5 +9,6 @@ public static class AuthPolicies
     public const string UsersManage = "UsersManage";
     public const string TenantRootOnly = "TenantRootOnly";
     public const string ApiKeysRotate = "ApiKeysRotate";
+    public const string BillingAccess = "BillingAccess";
     public const string PlatformAdminOnly = "PlatformAdminOnly";
 }

@@ -88,7 +88,6 @@ builder.Services.AddScoped<ConsumeImpersonationTicketCommand>();
 builder.Services.AddScoped<CreateLogCommand>();
 builder.Services.AddScoped<GetLogsQuery>();
 builder.Services.AddScoped<ExportLogsQuery>();
-builder.Services.AddScoped<GetLogFilterOptionsQuery>();
 builder.Services.AddScoped<GetTenantUsersQuery>();
 builder.Services.AddScoped<InviteUserCommand>();
 builder.Services.AddScoped<UpdateUserPermissionsCommand>();

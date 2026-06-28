@@ -14,32 +14,16 @@ public class LogsController : ControllerBase
 {
     private readonly CreateLogCommand _createCommand;
     private readonly GetLogsQuery _getLogsQuery;
-    private readonly GetLogFilterOptionsQuery _getLogFilterOptionsQuery;
     private readonly ExportLogsQuery _exportLogsQuery;
 
     public LogsController(
         CreateLogCommand createCommand,
         GetLogsQuery getLogsQuery,
-        GetLogFilterOptionsQuery getLogFilterOptionsQuery,
         ExportLogsQuery exportLogsQuery)
     {
         _createCommand = createCommand;
         _getLogsQuery = getLogsQuery;
-        _getLogFilterOptionsQuery = getLogFilterOptionsQuery;
         _exportLogsQuery = exportLogsQuery;
-    }
-
-    [Authorize(Policy = AuthPolicies.LogsRead)]
-    [HttpGet("filter-options")]
-    public async Task<ActionResult<Result<LogFilterOptionsDto>>> GetFilterOptions(
-        CancellationToken cancellationToken = default)
-    {
-        var result = await _getLogFilterOptionsQuery.ExecuteAsync(cancellationToken);
-
-        if (!result.IsSuccess)
-            return BadRequest(result);
-
-        return Ok(result);
     }
 
     [Authorize(Policy = AuthPolicies.LogsRead)]

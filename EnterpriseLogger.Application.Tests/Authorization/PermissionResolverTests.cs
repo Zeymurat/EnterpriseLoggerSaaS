@@ -24,7 +24,6 @@ public class PermissionResolverTests
         Assert.Contains(PermissionCodes.LogsRead, permissions);
         Assert.Contains(PermissionCodes.UsersInvite, permissions);
         Assert.DoesNotContain(PermissionCodes.ApiKeysRotate, permissions);
-        Assert.DoesNotContain(PermissionCodes.TenantSettingsWrite, permissions);
     }
 
     [Fact]

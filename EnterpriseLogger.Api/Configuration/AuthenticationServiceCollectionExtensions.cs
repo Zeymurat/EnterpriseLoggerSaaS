@@ -92,6 +92,13 @@ public static class AuthenticationServiceCollectionExtensions
                 policy.AddRequirements(new RootOnlyRequirement(), new ActiveTenantRequirement());
             });
 
+            options.AddPolicy(AuthPolicies.BillingAccess, policy =>
+            {
+                policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme);
+                policy.RequireAuthenticatedUser();
+                policy.AddRequirements(new ActiveTenantRequirement());
+            });
+
             options.AddPolicy(AuthPolicies.PlatformAdminOnly, policy =>
             {
                 policy.AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme);

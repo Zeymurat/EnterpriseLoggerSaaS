@@ -1,7 +1,7 @@
+using EnterpriseLogger.Application.Common.Constants;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Features.Billing.Dtos;
 using EnterpriseLogger.Application.Features.Billing.Queries;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -9,7 +9,7 @@ namespace EnterpriseLogger.Api.Controllers;
 
 [ApiController]
 [Route("api/billing")]
-[Authorize(AuthenticationSchemes = JwtBearerDefaults.AuthenticationScheme)]
+[Authorize(Policy = AuthPolicies.BillingAccess)]
 public class BillingController : ControllerBase
 {
     private readonly GetTenantBillingNoticeQuery _getTenantBillingNoticeQuery;

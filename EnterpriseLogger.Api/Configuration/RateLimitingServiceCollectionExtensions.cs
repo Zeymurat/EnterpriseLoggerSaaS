@@ -40,12 +40,6 @@ public static class RateLimitingServiceCollectionExtensions
         {
             return new RateLimitSettings
             {
-                LogIngestRequestsPerWindow = ParsePositiveInt(
-                    Environment.GetEnvironmentVariable("LOG_INGEST_RATE_LIMIT_PER_MINUTE"),
-                    10_000),
-                LogIngestWindowSeconds = ParsePositiveInt(
-                    Environment.GetEnvironmentVariable("LOG_INGEST_RATE_LIMIT_WINDOW_SECONDS"),
-                    60),
                 AuthLoginRequestsPerWindow = ParsePositiveInt(
                     Environment.GetEnvironmentVariable("AUTH_LOGIN_RATE_LIMIT_PER_MINUTE"),
                     10_000),
@@ -63,12 +57,6 @@ public static class RateLimitingServiceCollectionExtensions
 
         return new RateLimitSettings
         {
-            LogIngestRequestsPerWindow = ParsePositiveInt(
-                Environment.GetEnvironmentVariable("LOG_INGEST_RATE_LIMIT_PER_MINUTE"),
-                1000),
-            LogIngestWindowSeconds = ParsePositiveInt(
-                Environment.GetEnvironmentVariable("LOG_INGEST_RATE_LIMIT_WINDOW_SECONDS"),
-                60),
             AuthLoginRequestsPerWindow = ParsePositiveInt(
                 Environment.GetEnvironmentVariable("AUTH_LOGIN_RATE_LIMIT_PER_MINUTE"),
                 20),

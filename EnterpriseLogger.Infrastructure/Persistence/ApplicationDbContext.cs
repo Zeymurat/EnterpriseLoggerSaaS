@@ -202,9 +202,5 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             entity.Property(l => l.ExceptionType).HasMaxLength(256);
         });
     }
-
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-    {
-        return base.SaveChangesAsync(cancellationToken);
-    }
 }
+

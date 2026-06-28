@@ -87,7 +87,7 @@ Platform **dashboard** (KPI), **renewals** görünümü, **audit log** (tüm pla
 
 | Konu | Yaklaşım |
 |------|----------|
-| Log ingest | Redis fixed-window rate limit; paket `MaxLogsPerMinute` |
+| Log ingest | Paket bazlı `MaxLogsPerMinute` (Redis) + aylık kota (`CreateLogCommand`) |
 | Sorgular | EF Core indeksler (`TenantId`, `LogLevel`, `Timestamp`, `CorrelationId`) |
 | Liste API'leri | Sunucu tarafı sayfalama, filtreler, CSV export |
 | Log retention | Günlük batch delete; paket saklama süresine göre |
@@ -190,6 +190,18 @@ docker compose down          # veriler volume'da kalır
 docker compose down -v       # postgres/redis volume'larını da siler
 ```
 
+### Production-benzeri çalıştırma
+
+Varsayılan `docker-compose.yml` **local development** içindir (Swagger açık, Postgres/Redis host portları expose).
+
+Production-benzeri profil için:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+```
+
+Bu overlay: `ASPNETCORE_ENVIRONMENT=Production`, Swagger kapalı, DB/Redis host portları kapalı, API healthcheck aktif.
+
 ### Sorun giderme
 
 | Belirti | Çözüm |
@@ -244,7 +256,8 @@ Migration **Development** ortamında API başlarken otomatik uygulanır.
 
 ```
 EnterpriseLoggerSaaS/
-├── docker-compose.yml          # Tam yığın (DB, Redis, API, 2 FE)
+├── docker-compose.yml          # Local dev stack (DB, Redis, API, 2 FE)
+├── docker-compose.prod.yml     # Production overlay (no Swagger, no DB/Redis host ports)
 ├── .env.example
 ├── EnterpriseLogger.Api/       # Dockerfile, Controllers, Middleware
 ├── EnterpriseLogger.Application/
@@ -254,6 +267,22 @@ EnterpriseLoggerSaaS/
 ├── apps/tenant-panel/          # Dockerfile + nginx
 └── apps/platform-admin/
 ```
+
+---
+
+## Bilinen sınırlamalar
+
+Bu proje **portfolyo / öğrenim MVP+** olarak tamamlanmıştır. Üretim ortamına taşırken göz önünde bulundurun:
+
+| Konu | Durum |
+|------|--------|
+| Impersonate (login-as) | Ticket in-memory store; tek instance; ticket URL'de taşınabilir |
+| API key yetkisi | Geçerli API key tüm log read/write policy'lerini karşılar (RBAC bypass) |
+| Tenant izolasyonu | Otomatik EF filter yalnızca `SystemLogs` tablosunda; diğer entity'ler command seviyesinde |
+| Log ingest performansı | Yüksek hacimde aylık kota için DB `COUNT` kullanılır (Redis counter yok) |
+| Background job'lar | Çoklu API replica'da distributed lock yok |
+| Docker (varsayılan) | Development modu; prod için `docker-compose.prod.yml` kullanın |
+| E-posta bildirimleri | SMTP yapılandırması opsiyonel; paket `IsMailEnabled` gerekir |
 
 ---
 

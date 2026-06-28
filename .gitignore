@@ -4,6 +4,7 @@ obj/
 LOCAL-GUIDE.md
 LOCAL-BACKEND-GUIDE.md
 LOCAL-FRONTEND-GUIDE.md
+local-guide-ortam.md
 .DS_Store
 .vscode/
 .idea/

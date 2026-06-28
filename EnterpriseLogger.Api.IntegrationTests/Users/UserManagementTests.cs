@@ -262,6 +262,27 @@ public class UserManagementTests : IClassFixture<EnterpriseLoggerWebApplicationF
     }
 
     [Fact]
+    public async Task UpdatePermissions_OnSelf_ReturnsForbidden()
+    {
+        const string rootEmail = "root-self-perm@test.com";
+        const string userEmail = "self-perm@test.com";
+        const string password = "TestPass123";
+
+        var rootToken = await RegisterAndLoginAsync("Self Perm Corp", rootEmail, password);
+        var invite = await InviteUserAsync(rootToken, userEmail, "User", [PermissionCodes.UsersManage]);
+        var userId = invite.GetProperty("user").GetProperty("id").GetInt32();
+        var tempPassword = invite.GetProperty("temporaryPassword").GetString()!;
+        var userToken = await LoginAsync(userEmail, tempPassword);
+
+        using var patch = new HttpRequestMessage(HttpMethod.Patch, $"/api/users/{userId}/permissions");
+        patch.Headers.Authorization = new AuthenticationHeaderValue("Bearer", userToken);
+        patch.Content = JsonContent.Create(new { permissions = new[] { PermissionCodes.LogsRead, PermissionCodes.UsersManage } });
+
+        var response = await _client.SendAsync(patch);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
     public async Task GetUsers_WithApiKey_ReturnsUnauthorized()
     {
         var apiKey = await IntegrationTestAuth.RegisterLoginAndRotateApiKeyAsync(_client, "ApiKey Users Corp");

@@ -44,6 +44,41 @@ public class PlatformTenantManagementTests : IClassFixture<EnterpriseLoggerWebAp
     }
 
     [Fact]
+    public async Task SetTenantInactive_BlocksBillingWithExistingToken()
+    {
+        const string tenantName = "Inactive Billing Corp";
+        const string ownerEmail = "inactive-billing@test.com";
+        const string ownerPassword = "TestPass123";
+
+        await IntegrationTestAuth.RegisterTenantAsync(_client, tenantName, ownerEmail, ownerPassword);
+        var tenantId = await FindTenantIdAsync(tenantName);
+        var token = await IntegrationTestAuth.LoginAsync(_client, ownerEmail, ownerPassword);
+
+        using (var billing = new HttpRequestMessage(HttpMethod.Get, "/api/billing/overview"))
+        {
+            billing.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var before = await _client.SendAsync(billing);
+            before.EnsureSuccessStatusCode();
+        }
+
+        var platformToken = await IntegrationTestAuth.PlatformLoginAsync(_client);
+        using (var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/platform/tenants/{tenantId}/status"))
+        {
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", platformToken);
+            request.Content = JsonContent.Create(new { isActive = false });
+            var response = await _client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        using (var billing = new HttpRequestMessage(HttpMethod.Get, "/api/billing/overview"))
+        {
+            billing.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var after = await _client.SendAsync(billing);
+            Assert.Equal(HttpStatusCode.Forbidden, after.StatusCode);
+        }
+    }
+
+    [Fact]
     public async Task ResetRootPassword_AllowsLoginWithNewPassword()
     {
         const string tenantName = "Reset Password Corp";

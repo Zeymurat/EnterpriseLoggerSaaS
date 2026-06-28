@@ -11,8 +11,7 @@ public static class PermissionResolver
         PermissionCodes.LogsWrite,
         PermissionCodes.UsersRead,
         PermissionCodes.UsersInvite,
-        PermissionCodes.UsersManage,
-        PermissionCodes.TenantSettingsRead
+        PermissionCodes.UsersManage
     ];
 
     public static IReadOnlyList<string> Resolve(TenantUserRole role, IEnumerable<string>? grantedPermissionCodes = null) =>

@@ -4,7 +4,6 @@ using EnterpriseLogger.Application.Common.Interfaces;
 using EnterpriseLogger.Application.Common.Models;
 using EnterpriseLogger.Application.Common.Subscriptions;
 using EnterpriseLogger.Application.Features.Platform.Tenants.Dtos;
-using EnterpriseLogger.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace EnterpriseLogger.Application.Features.Platform.Tenants.Queries;
@@ -29,7 +28,7 @@ public class ExportPlatformTenantsQuery
 
         var query = PlatformTenantQueryBuilder.ApplyFilters(_context.Tenants.AsNoTracking(), filter);
 
-        var rows = await PlatformTenantQueryBuilder
+        var tenantRows = await PlatformTenantQueryBuilder
             .ApplySort(query, sortBy, sortDescending)
             .Take(PlatformTenantQueryBuilder.MaxExportRows)
             .Select(t => new
@@ -38,44 +37,34 @@ public class ExportPlatformTenantsQuery
                 t.Name,
                 t.IsActive,
                 t.CreatedAt,
-                UserCount = t.Users.Count,
-                LogCount = _context.SystemLogs.IgnoreQueryFilters().Count(l => l.TenantId == t.Id),
-                RootEmail = t.Users.Where(u => u.Role == TenantUserRole.Root).Select(u => u.Email).FirstOrDefault(),
-                RootPhone = t.Users.Where(u => u.Role == TenantUserRole.Root).Select(u => u.Phone).FirstOrDefault(),
-                PackageName = t.Subscriptions
-                    .Where(s => SubscriptionHelper.ActiveStatuses.Contains(s.Status) && s.EndDate > now)
-                    .OrderByDescending(s => s.StartDate)
-                    .Select(s => s.Package.Name)
-                    .FirstOrDefault(),
-                SubscriptionStatus = t.Subscriptions
-                    .Where(s => SubscriptionHelper.ActiveStatuses.Contains(s.Status) && s.EndDate > now)
-                    .OrderByDescending(s => s.StartDate)
-                    .Select(s => (SubscriptionStatus?)s.Status)
-                    .FirstOrDefault(),
-                SubscriptionStart = t.Subscriptions
-                    .Where(s => SubscriptionHelper.ActiveStatuses.Contains(s.Status) && s.EndDate > now)
-                    .OrderByDescending(s => s.StartDate)
-                    .Select(s => (DateTime?)s.StartDate)
-                    .FirstOrDefault(),
+                UserCount = t.Users.Count
             })
             .ToListAsync(cancellationToken);
+
+        var tenantIds = tenantRows.Select(t => t.Id).ToList();
+        var enrichment = await PlatformTenantEnrichmentLoader.LoadAsync(
+            _context,
+            tenantIds,
+            now,
+            cancellationToken);
 
         var builder = new StringBuilder();
         builder.AppendLine("Id,Firma,Durum,Root E-posta,Root Telefon,Paket,Abonelik Durumu,Paket Baslangic,Kayit,Kullanici,Log");
 
-        foreach (var row in rows)
+        foreach (var row in tenantRows)
         {
+            var details = enrichment[row.Id];
             builder.Append(row.Id).Append(',');
             builder.Append(Csv(row.Name)).Append(',');
             builder.Append(row.IsActive ? "Aktif" : "Pasif").Append(',');
-            builder.Append(Csv(row.RootEmail)).Append(',');
-            builder.Append(Csv(row.RootPhone)).Append(',');
-            builder.Append(Csv(row.PackageName)).Append(',');
-            builder.Append(Csv(SubscriptionStatusLabels.ToTurkish(row.SubscriptionStatus))).Append(',');
-            builder.Append(Csv(row.SubscriptionStart?.ToString("o", CultureInfo.InvariantCulture))).Append(',');
+            builder.Append(Csv(details.RootEmail)).Append(',');
+            builder.Append(Csv(details.RootPhone)).Append(',');
+            builder.Append(Csv(details.PackageName)).Append(',');
+            builder.Append(Csv(SubscriptionStatusLabels.ToTurkish(details.SubscriptionStatus))).Append(',');
+            builder.Append(Csv(details.SubscriptionStart?.ToString("o", CultureInfo.InvariantCulture))).Append(',');
             builder.Append(Csv(row.CreatedAt.ToString("o", CultureInfo.InvariantCulture))).Append(',');
             builder.Append(row.UserCount).Append(',');
-            builder.Append(row.LogCount);
+            builder.Append(details.LogCount);
             builder.AppendLine();
         }
 

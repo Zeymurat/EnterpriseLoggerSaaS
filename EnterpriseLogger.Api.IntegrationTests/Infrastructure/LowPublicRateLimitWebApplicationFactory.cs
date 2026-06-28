@@ -23,8 +23,6 @@ public class LowPublicRateLimitWebApplicationFactory : WebApplicationFactory<Pro
             services.RemoveAll<RateLimitSettings>();
             services.AddSingleton(new RateLimitSettings
             {
-                LogIngestRequestsPerWindow = 10_000,
-                LogIngestWindowSeconds = 60,
                 AuthLoginRequestsPerWindow = AuthLoginRequestsPerWindow,
                 AuthLoginWindowSeconds = 60,
                 TenantRegisterRequestsPerWindow = TenantRegisterRequestsPerWindow,

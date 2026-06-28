@@ -245,11 +245,6 @@ function parseContentDispositionFileName(header: string | null): string | null {
   return basicMatch?.[1] ?? null
 }
 
-export async function getLogFilterOptions(): Promise<LogFilterOptions> {
-  const response = await authFetch('/api/logs/filter-options')
-  return parseResult<LogFilterOptions>(response)
-}
-
 export async function getLogs(params: GetLogsParams = {}): Promise<LogListResponse> {
   const query = buildLogsSearchParams(params).toString()
   const path = query ? `/api/logs?${query}` : '/api/logs'
